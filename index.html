@@ -528,10 +528,10 @@
 
     <div class="chip-row" id="adminTabs">
       <div class="chip chip-money" data-tab="caixa" onclick="setAdminTab('caixa')">Caixa</div>
+      <div class="chip" data-tab="agenda" onclick="setAdminTab('agenda')">Agendas</div>
       <div class="chip active" data-tab="hours" onclick="setAdminTab('hours')">Funcionamento</div>
       <div class="chip" data-tab="staff" onclick="setAdminTab('staff')">Colaboradores</div>
       <div class="chip" data-tab="services" onclick="setAdminTab('services')">Serviços</div>
-      <div class="chip" data-tab="agenda" onclick="setAdminTab('agenda')">Agendas</div>
     </div>
 
     <!-- TAB: FUNCIONAMENTO -->
@@ -1054,6 +1054,14 @@ async function cancelBooking(id){
   renderAppointments();
   toast('Agendamento cancelado');
 }
+async function adminCancelBooking(id){
+  const res = await apiPost('cancelBooking', { id });
+  if(res.error){ toast(res.error); return; }
+  bookings = bookings.filter(b=>b.id!==id);
+  renderAgendaApptList();
+  renderCaixaList();
+  toast('Agendamento cancelado');
+}
 
 /* ===================== ADMIN ===================== */
 function renderAdminDays(){
@@ -1374,6 +1382,9 @@ function renderAgendaApptList(){
           <div class="appt-status">Confirmado</div>
           <strong class="appt-value">R$ ${s ? s.price : 0}</strong>
         </div>
+        <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})" title="Cancelar agendamento">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
+        </button>
       </div>
     `;
   }).join('');
@@ -1425,6 +1436,9 @@ function renderCaixaList(){
             <p>${s ? s.name : 'Serviço'} · ${p ? p.name : '—'} · ${weekdayLabel[d.getDay()]} ${String(d.getDate()).padStart(2,'0')} · ${b.time}</p>
           </div>
           <div class="service-price"><strong>R$ ${s ? s.price : 0}</strong></div>
+          <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})" title="Cancelar agendamento">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
+          </button>
         </div>
       `;
     }).join('');
