@@ -258,6 +258,8 @@
     font-size:.62rem; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:.06em;
     background:rgba(111,165,122,.15); color:var(--ok); flex:none;
   }
+  .appt-side{display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex:none;}
+  .appt-value{font-family:'Playfair Display',serif; color:var(--red-bright); font-size:1rem;}
   .appt-actions{padding:0 22px; margin:-4px 0 18px;}
   .link-danger{background:none; border:none; color:var(--danger); font-size:.78rem; cursor:pointer; text-decoration:underline;}
 
@@ -492,6 +494,7 @@
       <div class="chip" data-tab="staff" onclick="setAdminTab('staff')">Colaboradores</div>
       <div class="chip" data-tab="services" onclick="setAdminTab('services')">Serviços</div>
       <div class="chip" data-tab="agenda" onclick="setAdminTab('agenda')">Agendas</div>
+      <div class="chip" data-tab="caixa" onclick="setAdminTab('caixa')">Caixa</div>
     </div>
 
     <!-- TAB: FUNCIONAMENTO -->
@@ -553,6 +556,31 @@
       <div class="admin-block"><h3>Agenda por colaborador</h3></div>
       <div class="chip-row" id="agendaStaffChips"></div>
       <div id="agendaApptList"></div>
+    </div>
+
+    <!-- TAB: CAIXA -->
+    <div class="admin-tab" id="adminTab-caixa" style="display:none;">
+      <div class="admin-block"><h3>Caixa · Serviços realizados</h3></div>
+
+      <div class="admin-day">
+        <div class="admin-times">
+          <div class="field"><label>De</label><input id="caixaDateFrom" type="date" onchange="applyCaixaFilters()"></div>
+          <div class="field"><label>Até</label><input id="caixaDateTo" type="date" onchange="applyCaixaFilters()"></div>
+        </div>
+        <div class="field" style="margin-top:14px; margin-bottom:0;">
+          <label>Colaborador</label>
+          <select id="caixaProfFilter" onchange="applyCaixaFilters()"></select>
+        </div>
+        <button class="btn-text" style="margin-top:12px;" onclick="clearCaixaFilters()">Limpar filtros</button>
+      </div>
+
+      <div class="section-label" style="margin-top:18px;"><span id="caixaCount">0 serviços</span><div class="line"></div></div>
+      <div class="service-list" id="caixaList"></div>
+
+      <div class="summary-chip" style="margin-top:6px;">
+        <div><strong>Total no período</strong><p>Soma dos serviços filtrados</p></div>
+        <b id="caixaTotal">R$ 0</b>
+      </div>
     </div>
   </section>
 
@@ -644,6 +672,31 @@ let state = {
 let editingStaffId = null;
 let editingServiceId = null;
 let selectedAgendaStaff = null;
+let caixaFilters = { dateFrom:null, dateTo:null, profId:'all' };
+
+/* ===================== PERSISTÊNCIA LOCAL (localStorage) ===================== */
+// Salva tudo que o admin configura/cadastra no navegador do próprio aparelho.
+// Importante: isso é por navegador/aparelho, não é compartilhado entre diferentes celulares.
+// Pra persistência de verdade entre todos os usuários, o próximo passo é conectar ao Google Sheets/Apps Script.
+const STORAGE_KEY = 'monteiroBarbearia_v1';
+function persistAll(){
+  try{
+    const payload = { businessConfig, professionals, services, bookings, registeredClients };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch(e){ console.warn('Não foi possível salvar localmente:', e); }
+}
+function loadPersisted(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    if(data.businessConfig) businessConfig = data.businessConfig;
+    if(data.professionals) professionals = data.professionals;
+    if(data.services) services = data.services;
+    if(data.bookings) bookings = data.bookings;
+    if(data.registeredClients) registeredClients = data.registeredClients;
+  } catch(e){ console.warn('Não foi possível carregar dados salvos:', e); }
+}
 
 /* ===================== HELPERS ===================== */
 function isoOffset(days){
@@ -706,6 +759,7 @@ function doRegister(){
   if(registeredClients[digits]){ toast('Esse celular já tem cadastro. Faça login.'); return; }
   registeredClients[digits] = {name, password:pass};
   state.userName = name;
+  persistAll();
   finishLogin();
   toast('Conta criada com sucesso!');
 }
@@ -904,6 +958,7 @@ function confirmBooking(){
     clientName: state.userName || 'Você'
   };
   bookings.push(newBooking);
+  persistAll();
 
   document.getElementById('confirmCard').innerHTML = `
     <div class="confirm-row"><span>Serviço</span><strong>${state.selectedService.name}</strong></div>
@@ -942,6 +997,7 @@ function renderAppointments(){
 }
 function cancelBooking(id){
   bookings = bookings.filter(b=>b.id!==id);
+  persistAll();
   renderAppointments();
   toast('Agendamento cancelado');
 }
@@ -984,6 +1040,7 @@ function saveAdminConfig(){
   businessConfig.interval = Number(document.getElementById('adminInterval').value);
   businessConfig.breakStart = document.getElementById('breakStart').value;
   businessConfig.breakEnd = document.getElementById('breakEnd').value;
+  persistAll();
   toast('Configurações salvas! Os horários dos clientes já refletem a alteração.');
 }
 
@@ -1000,6 +1057,7 @@ function setAdminTab(tab){
     renderAgendaStaffChips();
     renderAgendaApptList();
   }
+  if(tab === 'caixa'){ renderCaixaTab(); }
 }
 
 /* ===================== ADMIN · COLABORADORES ===================== */
@@ -1083,6 +1141,7 @@ function saveStaff(){
     staff.name = name;
     staff.role = role || staff.role;
     staff.serviceIds = serviceIds;
+    staff.initials = name.trim().split(/\s+/).map(w => w[0]).slice(0,2).join('').toUpperCase();
   } else {
     const newId = professionals.length ? Math.max(...professionals.map(p => p.id)) + 1 : 1;
     const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0,2).join('').toUpperCase();
@@ -1091,6 +1150,7 @@ function saveStaff(){
   }
   closeStaffForm();
   renderStaffList();
+  persistAll();
   toast('Colaborador salvo com sucesso!');
 }
 function deleteStaff(id){
@@ -1098,6 +1158,7 @@ function deleteStaff(id){
   bookings = bookings.filter(b => b.profId !== id);
   if(selectedAgendaStaff === id) selectedAgendaStaff = null;
   renderStaffList();
+  persistAll();
   toast('Colaborador removido');
 }
 
@@ -1184,6 +1245,7 @@ function saveService(){
   renderAdminServiceList();
   renderCategoryChips();
   renderServices();
+  persistAll();
   toast('Serviço salvo com sucesso!');
 }
 function deleteService(id){
@@ -1193,6 +1255,7 @@ function deleteService(id){
   renderAdminServiceList();
   renderCategoryChips();
   renderServices();
+  persistAll();
   toast('Serviço removido');
 }
 
@@ -1233,16 +1296,79 @@ function renderAgendaApptList(){
       <div class="appt-card">
         <div class="appt-date"><span>${weekdayLabel[d.getDay()]}</span><strong>${String(d.getDate()).padStart(2,'0')}</strong></div>
         <div class="appt-info">
-          <h3>${s ? s.name : 'Serviço'}</h3>
-          <p>${b.clientName || 'Cliente'} · ${b.time}</p>
+          <h3>${b.clientName || 'Cliente'}</h3>
+          <p>${s ? s.name : 'Serviço'} · ${b.time}</p>
         </div>
-        <div class="appt-status">Confirmado</div>
+        <div class="appt-side">
+          <div class="appt-status">Confirmado</div>
+          <strong class="appt-value">R$ ${s ? s.price : 0}</strong>
+        </div>
       </div>
     `;
   }).join('');
 }
 
+/* ===================== ADMIN · CAIXA ===================== */
+function renderCaixaTab(){
+  const profSelect = document.getElementById('caixaProfFilter');
+  profSelect.innerHTML = `<option value="all">Todos os colaboradores</option>` +
+    professionals.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  profSelect.value = caixaFilters.profId;
+  document.getElementById('caixaDateFrom').value = caixaFilters.dateFrom || '';
+  document.getElementById('caixaDateTo').value = caixaFilters.dateTo || '';
+  renderCaixaList();
+}
+function applyCaixaFilters(){
+  caixaFilters.dateFrom = document.getElementById('caixaDateFrom').value || null;
+  caixaFilters.dateTo = document.getElementById('caixaDateTo').value || null;
+  caixaFilters.profId = document.getElementById('caixaProfFilter').value;
+  renderCaixaList();
+}
+function clearCaixaFilters(){
+  caixaFilters = { dateFrom:null, dateTo:null, profId:'all' };
+  document.getElementById('caixaDateFrom').value = '';
+  document.getElementById('caixaDateTo').value = '';
+  document.getElementById('caixaProfFilter').value = 'all';
+  renderCaixaList();
+}
+function renderCaixaList(){
+  let list = [...bookings];
+  if(caixaFilters.profId !== 'all') list = list.filter(b => b.profId === Number(caixaFilters.profId));
+  if(caixaFilters.dateFrom) list = list.filter(b => b.date >= caixaFilters.dateFrom);
+  if(caixaFilters.dateTo) list = list.filter(b => b.date <= caixaFilters.dateTo);
+  list.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
+
+  const wrap = document.getElementById('caixaList');
+  if(!list.length){
+    wrap.innerHTML = `<div class="empty-note">Nenhum serviço encontrado para o filtro selecionado.</div>`;
+  } else {
+    wrap.innerHTML = list.map(b => {
+      const s = services.find(x => x.id === b.serviceId);
+      const p = professionals.find(x => x.id === b.profId);
+      const d = new Date(b.date + 'T00:00');
+      return `
+        <div class="service-card">
+          <div class="service-bar"></div>
+          <div class="service-info">
+            <h3>${b.clientName || 'Cliente'}</h3>
+            <p>${s ? s.name : 'Serviço'} · ${p ? p.name : '—'} · ${weekdayLabel[d.getDay()]} ${String(d.getDate()).padStart(2,'0')} · ${b.time}</p>
+          </div>
+          <div class="service-price"><strong>R$ ${s ? s.price : 0}</strong></div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  const total = list.reduce((sum, b) => {
+    const s = services.find(x => x.id === b.serviceId);
+    return sum + (s ? s.price : 0);
+  }, 0);
+  document.getElementById('caixaCount').textContent = `${list.length} serviço${list.length === 1 ? '' : 's'}`;
+  document.getElementById('caixaTotal').textContent = `R$ ${total}`;
+}
+
 /* ===================== INIT ===================== */
+loadPersisted();
 renderCategoryChips();
 renderServices();
 renderAppointments();
