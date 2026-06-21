@@ -654,17 +654,26 @@
 </div>
 
 <script>
-/* ===================== MOCK DATA (substituir depois pela integração com Google Sheets / Apps Script) ===================== */
-let services = [
-  {id:1, cat:'Cabelo',  name:'Corte Clássico',        duration:30, price:45},
-  {id:2, cat:'Cabelo',  name:'Corte + Sobrancelha',   duration:45, price:60},
-  {id:3, cat:'Barba',   name:'Barba Completa',        duration:30, price:35},
-  {id:4, cat:'Barba',   name:'Barboterapia',          duration:40, price:50},
-  {id:5, cat:'Unhas',   name:'Manicure',              duration:40, price:40},
-  {id:6, cat:'Unhas',   name:'Spa dos Pés',           duration:50, price:55},
-  {id:7, cat:'Estética',name:'Limpeza de Pele',       duration:60, price:90},
-  {id:8, cat:'Estética',name:'Massagem Relaxante',    duration:50, price:80},
-];
+/* ===================== CONEXÃO COM O BACKEND (Google Sheets / Apps Script) ===================== */
+// Cole aqui a URL gerada ao implantar o Apps Script como "App da Web" (termina em /exec)
+const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxFM24l8mcGtn8vVskFHswd3ZWGzIqOqArTI8Qxr3V77Xh6is4vlhiESbmJcG393lU1cw/exec';
+
+async function apiGet(){
+  const res = await fetch(API_BASE_URL);
+  return res.json();
+}
+async function apiPost(action, data){
+  const res = await fetch(API_BASE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita pre-flight CORS no Apps Script
+    body: JSON.stringify({ action, data })
+  });
+  return res.json();
+}
+
+/* ===================== DADOS (carregados do backend) ===================== */
+let services = [];
+
 // Lista mestre de categorias possíveis (usada no formulário de cadastro de serviço no admin)
 const masterCategories = ['Cabelo','Barba','Unhas','Estética'];
 
@@ -674,21 +683,16 @@ const avatarPalette = [
   ['#a83f2c','#3a1410'], ['#c8593f','#572218'], ['#9c3f2e','#33120e'],
 ];
 
-let professionals = [
-  {id:1, name:'Marcos',  role:'Barbeiro Master', initials:'MC', c1:'#c4503a', c2:'#5e211a', serviceIds:[1,2,3,4]},
-  {id:2, name:'Sara',    role:'Hair Stylist',     initials:'SR', c1:'#d6604a', c2:'#6b2a1d', serviceIds:[1,2,7,8]},
-  {id:3, name:'Adriano', role:'Nail Designer',    initials:'AD', c1:'#b8442f', c2:'#4a1812', serviceIds:[5,6]},
-];
+let professionals = [];
 
 // Credenciais fixas do admin (mock). Em produção: usuário/senha com hash, validado no backend.
 const ADMIN_CREDENTIALS = {user:'admin', pass:'123456'};
 
-// Configuração definida pelo administrador (horário de funcionamento + intervalo entre atendimentos)
+// Configuração de funcionamento — valores padrão de segurança até o backend responder
 let businessConfig = {
-  interval: 30, // minutos
+  interval: 30,
   breakStart: '12:00',
   breakEnd: '13:00',
-  // 0=Domingo ... 6=Sábado — horários reais da Monteiró Barbearia
   hours: {
     0: {closed:true,  open:'08:00', close:'18:00'},
     1: {closed:true,  open:'08:00', close:'18:00'},
@@ -703,19 +707,10 @@ let businessConfig = {
 const weekdayLabel = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const weekdayFull  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 
-let bookings = [
-  {id:101, serviceId:1, profId:1, date: isoOffset(2), time:'10:00', clientName:'Você'},
-  {id:102, serviceId:5, profId:3, date: isoOffset(5), time:'14:30', clientName:'Você'},
-];
-
-// Clientes já cadastrados (mock) — chave é o celular só com dígitos.
-// Em produção isso viria da aba "Clientes" da planilha / backend (senha sempre com hash, nunca em texto puro).
-let registeredClients = {
-  '11987654321': {name:'Felipe Augusto', password:'1234'},
-};
+let bookings = [];
 
 let state = {
-  loggedIn:false, isAdmin:false, userName:'Cliente',
+  loggedIn:false, isAdmin:false, userName:'Cliente', userPhone:null,
   activeCategory:'Todos',
   selectedService:null, selectedProf:null, selectedDate:null, selectedSlot:null,
 };
@@ -724,29 +719,16 @@ let editingServiceId = null;
 let selectedAgendaStaff = null;
 let caixaFilters = { dateFrom:null, dateTo:null, profId:'all' };
 
-/* ===================== PERSISTÊNCIA LOCAL (localStorage) ===================== */
-// Salva tudo que o admin configura/cadastra no navegador do próprio aparelho.
-// Importante: isso é por navegador/aparelho, não é compartilhado entre diferentes celulares.
-// Pra persistência de verdade entre todos os usuários, o próximo passo é conectar ao Google Sheets/Apps Script.
-const STORAGE_KEY = 'monteiroBarbearia_v1';
-function persistAll(){
-  try{
-    const payload = { businessConfig, professionals, services, bookings, registeredClients };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch(e){ console.warn('Não foi possível salvar localmente:', e); }
+/* ===================== CARREGAMENTO DE DADOS ===================== */
+async function loadData(){
+  const data = await apiGet();
+  if(data.error) throw new Error(data.error);
+  services = data.services;
+  professionals = data.professionals;
+  businessConfig = data.businessConfig;
+  bookings = data.bookings;
 }
-function loadPersisted(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return;
-    const data = JSON.parse(raw);
-    if(data.businessConfig) businessConfig = data.businessConfig;
-    if(data.professionals) professionals = data.professionals;
-    if(data.services) services = data.services;
-    if(data.bookings) bookings = data.bookings;
-    if(data.registeredClients) registeredClients = data.registeredClients;
-  } catch(e){ console.warn('Não foi possível carregar dados salvos:', e); }
-}
+
 function renderHeroHours(){
   const wrap = document.getElementById('heroHours');
   if(!wrap) return;
@@ -796,29 +778,31 @@ function maskPhone(el){
   else if(d.length>0) el.value = `(${d}`;
   else el.value = '';
 }
-function doLogin(){
+async function doLogin(){
   const digits = document.getElementById('loginPhone').value.replace(/\D/g,'');
   const pass = document.getElementById('loginPass').value;
   if(digits.length < 10){ toast('Digite um celular válido com DDD'); return; }
   if(!pass){ toast('Digite sua senha'); return; }
-  const client = registeredClients[digits];
-  if(!client){ toast('Celular não encontrado. Crie uma conta.'); return; }
-  if(client.password !== pass){ toast('Senha incorreta'); return; }
-  state.userName = client.name;
+  toast('Entrando...');
+  const res = await apiPost('login', { phone: digits, password: pass });
+  if(res.error){ toast(res.error); return; }
+  state.userName = res.name;
+  state.userPhone = res.phone;
   finishLogin();
   toast('Bem-vindo(a) de volta!');
 }
-function doRegister(){
+async function doRegister(){
   const name = document.getElementById('regName').value.trim();
   const digits = document.getElementById('regPhone').value.replace(/\D/g,'');
   const pass = document.getElementById('regPass').value;
   if(!name){ toast('Digite seu nome'); return; }
   if(digits.length < 10){ toast('Digite um celular válido com DDD'); return; }
   if(!pass || pass.length < 4){ toast('A senha precisa de ao menos 4 caracteres'); return; }
-  if(registeredClients[digits]){ toast('Esse celular já tem cadastro. Faça login.'); return; }
-  registeredClients[digits] = {name, password:pass};
-  state.userName = name;
-  persistAll();
+  toast('Criando conta...');
+  const res = await apiPost('register', { name, phone: digits, password: pass });
+  if(res.error){ toast(res.error); return; }
+  state.userName = res.name;
+  state.userPhone = res.phone;
   finishLogin();
   toast('Conta criada com sucesso!');
 }
@@ -850,7 +834,7 @@ function enterAdmin(){
 }
 function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 function logoutUser(){
-  state.loggedIn = false; state.isAdmin = false;
+  state.loggedIn = false; state.isAdmin = false; state.userPhone = null;
   state.selectedService = null; state.selectedProf = null; state.selectedDate = null; state.selectedSlot = null;
   document.getElementById('navAdmin').style.display = 'none';
   showScreen('screen-login');
@@ -1005,19 +989,21 @@ function updateConfirmBtn(){
   document.getElementById('confirmBtn').disabled = !state.selectedSlot || !state.selectedProf;
 }
 
-function confirmBooking(){
+async function confirmBooking(){
   const prof = professionals.find(p=>p.id===state.selectedProf);
   if(!prof){ toast('Selecione um colaborador antes de confirmar'); return; }
-  const newBooking = {
-    id: Date.now(),
+  const payload = {
     serviceId: state.selectedService.id,
     profId: state.selectedProf,
     date: state.selectedDate,
     time: state.selectedSlot,
-    clientName: state.userName || 'Você'
+    clientName: state.userName || 'Cliente',
+    clientPhone: state.userPhone || ''
   };
-  bookings.push(newBooking);
-  persistAll();
+  toast('Agendando...');
+  const res = await apiPost('addBooking', payload);
+  if(res.error){ toast(res.error); return; }
+  bookings.push({ id: res.id, ...payload });
 
   document.getElementById('successModalDetails').innerHTML = `
     <div class="confirm-row"><span>Serviço</span><strong>${state.selectedService.name}</strong></div>
@@ -1038,7 +1024,8 @@ function closeSuccessModal(){
 /* ===================== APPOINTMENTS ===================== */
 function renderAppointments(){
   const wrap = document.getElementById('apptList');
-  const upcoming = [...bookings].sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
+  const mine = bookings.filter(b => b.clientPhone === state.userPhone);
+  const upcoming = [...mine].sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
   if(!upcoming.length){
     wrap.innerHTML = `<div class="empty-note">Você ainda não tem agendamentos.</div>`;
     return;
@@ -1060,9 +1047,10 @@ function renderAppointments(){
     `;
   }).join('');
 }
-function cancelBooking(id){
+async function cancelBooking(id){
+  const res = await apiPost('cancelBooking', { id });
+  if(res.error){ toast(res.error); return; }
   bookings = bookings.filter(b=>b.id!==id);
-  persistAll();
   renderAppointments();
   toast('Agendamento cancelado');
 }
@@ -1101,11 +1089,13 @@ function toggleDay(dow, isOpen){
 function updateHour(dow, field, value){
   businessConfig.hours[dow][field] = value;
 }
-function saveAdminConfig(){
+async function saveAdminConfig(){
   businessConfig.interval = Number(document.getElementById('adminInterval').value);
   businessConfig.breakStart = document.getElementById('breakStart').value;
   businessConfig.breakEnd = document.getElementById('breakEnd').value;
-  persistAll();
+  toast('Salvando...');
+  const res = await apiPost('saveConfig', businessConfig);
+  if(res.error){ toast(res.error); return; }
   renderHeroHours();
   toast('Configurações salvas! Os horários dos clientes já refletem a alteração.');
 }
@@ -1196,35 +1186,43 @@ function closeStaffForm(){
   wrap.style.display = 'none';
   wrap.innerHTML = '';
 }
-function saveStaff(){
+async function saveStaff(){
   const name = document.getElementById('staffFormName').value.trim();
   const role = document.getElementById('staffFormRole').value.trim();
   const serviceIds = Array.from(document.querySelectorAll('#staffFormWrap input[type=checkbox]:checked')).map(c => Number(c.value));
   if(!name){ toast('Digite o nome do colaborador'); return; }
 
+  toast('Salvando...');
   if(editingStaffId){
     const staff = professionals.find(p => p.id === editingStaffId);
-    staff.name = name;
-    staff.role = role || staff.role;
-    staff.serviceIds = serviceIds;
-    staff.initials = name.trim().split(/\s+/).map(w => w[0]).slice(0,2).join('').toUpperCase();
+    const updated = {
+      id: editingStaffId, name, role: role || staff.role, serviceIds,
+      initials: name.trim().split(/\s+/).map(w => w[0]).slice(0,2).join('').toUpperCase(),
+      c1: staff.c1, c2: staff.c2
+    };
+    const res = await apiPost('saveStaff', updated);
+    if(res.error){ toast(res.error); return; }
+    Object.assign(staff, updated);
   } else {
-    const newId = professionals.length ? Math.max(...professionals.map(p => p.id)) + 1 : 1;
     const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0,2).join('').toUpperCase();
     const colors = avatarPalette[professionals.length % avatarPalette.length];
-    professionals.push({id:newId, name, role: role || 'Profissional', initials, c1:colors[0], c2:colors[1], serviceIds});
+    const newStaff = {name, role: role || 'Profissional', initials, c1:colors[0], c2:colors[1], serviceIds};
+    const res = await apiPost('saveStaff', newStaff);
+    if(res.error){ toast(res.error); return; }
+    professionals.push({id: res.id, ...newStaff});
   }
   closeStaffForm();
   renderStaffList();
-  persistAll();
   toast('Colaborador salvo com sucesso!');
 }
-function deleteStaff(id){
+async function deleteStaff(id){
+  toast('Removendo...');
+  const res = await apiPost('deleteStaff', { id });
+  if(res.error){ toast(res.error); return; }
   professionals = professionals.filter(p => p.id !== id);
   bookings = bookings.filter(b => b.profId !== id);
   if(selectedAgendaStaff === id) selectedAgendaStaff = null;
   renderStaffList();
-  persistAll();
   toast('Colaborador removido');
 }
 
@@ -1291,7 +1289,7 @@ function closeServiceForm(){
   wrap.style.display = 'none';
   wrap.innerHTML = '';
 }
-function saveService(){
+async function saveService(){
   const name = document.getElementById('svcFormName').value.trim();
   const cat = document.getElementById('svcFormCat').value;
   const duration = Number(document.getElementById('svcFormDuration').value);
@@ -1300,28 +1298,35 @@ function saveService(){
   if(!duration || duration <= 0){ toast('Informe uma duração válida'); return; }
   if(price < 0){ toast('Informe um preço válido'); return; }
 
+  toast('Salvando...');
   if(editingServiceId){
+    const payload = { id: editingServiceId, name, cat, duration, price };
+    const res = await apiPost('saveService', payload);
+    if(res.error){ toast(res.error); return; }
     const s = services.find(x => x.id === editingServiceId);
-    s.name = name; s.cat = cat; s.duration = duration; s.price = price;
+    Object.assign(s, payload);
   } else {
-    const newId = services.length ? Math.max(...services.map(s => s.id)) + 1 : 1;
-    services.push({id:newId, cat, name, duration, price});
+    const payload = { cat, name, duration, price };
+    const res = await apiPost('saveService', payload);
+    if(res.error){ toast(res.error); return; }
+    services.push({id: res.id, ...payload});
   }
   closeServiceForm();
   renderAdminServiceList();
   renderCategoryChips();
   renderServices();
-  persistAll();
   toast('Serviço salvo com sucesso!');
 }
-function deleteService(id){
+async function deleteService(id){
+  toast('Removendo...');
+  const res = await apiPost('deleteService', { id });
+  if(res.error){ toast(res.error); return; }
   services = services.filter(s => s.id !== id);
   professionals.forEach(p => { p.serviceIds = p.serviceIds.filter(sid => sid !== id); });
   bookings = bookings.filter(b => b.serviceId !== id);
   renderAdminServiceList();
   renderCategoryChips();
   renderServices();
-  persistAll();
   toast('Serviço removido');
 }
 
@@ -1434,11 +1439,19 @@ function renderCaixaList(){
 }
 
 /* ===================== INIT ===================== */
-loadPersisted();
-renderHeroHours();
-renderCategoryChips();
-renderServices();
-renderAppointments();
+async function init(){
+  try{
+    await loadData();
+  } catch(e){
+    toast('Não foi possível carregar os dados do servidor. Verifique sua internet.');
+    console.error(e);
+  }
+  renderHeroHours();
+  renderCategoryChips();
+  renderServices();
+  renderAppointments();
+}
+init();
 
 // Atualiza a lista de agendamentos sempre que a tela for aberta
 document.getElementById('navAppt').addEventListener('click', renderAppointments);
