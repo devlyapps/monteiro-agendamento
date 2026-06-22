@@ -164,6 +164,26 @@
     border-radius:var(--radius); padding:11px 16px; font-size:.85rem; text-align:center;
     margin:0 0 14px; cursor:pointer;
   }
+  .img-upload-wrap{ display:flex; flex-direction:column; gap:10px; }
+  .img-preview-box{
+    width:100%; height:140px; border-radius:var(--radius);
+    border:2px dashed rgba(196,60,45,.35); display:flex; align-items:center;
+    justify-content:center; overflow:hidden; background:var(--surface); cursor:pointer;
+    position:relative;
+  }
+  .img-preview-box img{ width:100%; height:100%; object-fit:cover; }
+  .img-preview-box .img-placeholder{ color:var(--muted); font-size:.82rem; text-align:center; padding:12px; }
+  .img-preview-box .img-remove{
+    position:absolute; top:6px; right:6px;
+    background:rgba(0,0,0,.7); border:none; border-radius:50%;
+    width:26px; height:26px; color:#fff; cursor:pointer; font-size:14px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .img-upload-btn{
+    background:transparent; border:1px solid var(--red-dim); color:var(--cream);
+    border-radius:var(--radius); padding:9px 14px; font-size:.85rem; cursor:pointer;
+    text-align:center;
+  }
   .search-box input::placeholder{color:var(--muted-2);}
 
   .chip-row{display:flex; gap:10px; overflow-x:auto; padding:4px 22px 18px; scrollbar-width:none;}
@@ -926,7 +946,10 @@ function renderServices(){
   const wrap = document.getElementById('serviceList');
   wrap.innerHTML = list.length ? list.map(s => `
     <div class="service-card">
-      ${s.imageUrl ? `<img class="service-thumb" src="${s.imageUrl}" alt="${s.name}">` : `<div class="service-bar"></div>`}
+      ${s.imageUrl
+        ? `<img class="service-thumb" src="${s.imageUrl.startsWith('data:') ? s.imageUrl : s.imageUrl}" alt="${s.name}">`
+        : `<div class="service-bar"></div>`
+      }
       <div class="service-info">
         <h3>${s.name}</h3>
         <p>${s.cat} · ${s.duration} min</p>
@@ -1321,6 +1344,7 @@ function renderAdminServiceList(){
 }
 function serviceFormHTML(s){
   const isEdit = !!s;
+  const hasImg = isEdit && s.imageUrl;
   return `
     <div class="admin-inline-form">
       <h3 style="font-size:.92rem; margin-bottom:14px;">${isEdit ? 'Editar serviço' : 'Novo serviço'}</h3>
@@ -1335,7 +1359,22 @@ function serviceFormHTML(s){
         <div class="field"><label>Duração (min)</label><input id="svcFormDuration" type="number" min="5" step="5" value="${isEdit ? s.duration : 30}"></div>
         <div class="field"><label>Preço (R$)</label><input id="svcFormPrice" type="number" min="0" step="5" value="${isEdit ? s.price : 0}"></div>
       </div>
-      <div class="field"><label>Foto do serviço (opcional)</label><input id="svcFormImage" type="text" value="${isEdit && s.imageUrl ? s.imageUrl : ''}" placeholder="Ex: corte-classico.jpg"></div>
+      <div class="field">
+        <label>Foto do serviço (opcional)</label>
+        <div class="img-upload-wrap">
+          <div class="img-preview-box" onclick="document.getElementById('svcImgInput').click()" id="svcImgPreviewBox">
+            ${hasImg
+              ? `<img id="svcImgPreview" src="${s.imageUrl}" alt="preview">
+                 <button class="img-remove" onclick="event.stopPropagation(); removeSvcImage()" title="Remover foto">✕</button>`
+              : `<div class="img-placeholder">📷<br>Toque para escolher uma foto</div>`
+            }
+          </div>
+          <input type="file" id="svcImgInput" accept="image/*" style="display:none" onchange="handleSvcImageUpload(this)">
+          <button class="img-upload-btn" onclick="document.getElementById('svcImgInput').click()">
+            ${hasImg ? '🔄 Trocar foto' : '📁 Escolher foto da galeria'}
+          </button>
+        </div>
+      </div>
       <div style="display:flex; gap:10px; margin-top:18px;">
         <button class="btn btn-gold" style="flex:1;" onclick="saveService()">Salvar</button>
         <button class="btn btn-ghost" style="flex:1;" onclick="closeServiceForm()">Cancelar</button>
@@ -1345,7 +1384,9 @@ function serviceFormHTML(s){
 }
 function openServiceForm(id){
   editingServiceId = id;
+  svcImageData = null; // limpa imagem pendente ao abrir o form
   const s = id ? services.find(x => x.id === id) : null;
+  if(s) svcImageData = s.imageUrl || null; // carrega imagem existente
   const wrap = document.getElementById('serviceFormWrap');
   wrap.style.display = 'block';
   wrap.innerHTML = serviceFormHTML(s);
@@ -1353,16 +1394,63 @@ function openServiceForm(id){
 }
 function closeServiceForm(){
   editingServiceId = null;
+  svcImageData = null;
   const wrap = document.getElementById('serviceFormWrap');
   wrap.style.display = 'none';
   wrap.innerHTML = '';
+}
+
+// Variável que guarda a imagem atual do formulário de serviço (base64 ou filename)
+let svcImageData = null;
+
+function handleSvcImageUpload(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      // Comprime e redimensiona para caber no Google Sheets (max 50k chars por célula)
+      const MAX = 400;
+      let w = img.width, h = img.height;
+      if(w > h){ if(w > MAX){ h = Math.round(h * MAX / w); w = MAX; } }
+      else      { if(h > MAX){ w = Math.round(w * MAX / h); h = MAX; } }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+      svcImageData = dataUrl;
+      // Atualiza o preview no formulário
+      const box = document.getElementById('svcImgPreviewBox');
+      if(box){
+        box.innerHTML = `
+          <img id="svcImgPreview" src="${dataUrl}" alt="preview">
+          <button class="img-remove" onclick="event.stopPropagation(); removeSvcImage()" title="Remover foto">✕</button>
+        `;
+      }
+      const btn = input.parentElement && input.parentElement.querySelector('.img-upload-btn');
+      if(btn) btn.textContent = '🔄 Trocar foto';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeSvcImage(){
+  svcImageData = null;
+  const box = document.getElementById('svcImgPreviewBox');
+  if(box) box.innerHTML = `<div class="img-placeholder">📷<br>Toque para escolher uma foto</div>`;
+  const btn = document.querySelector('.img-upload-btn');
+  if(btn) btn.textContent = '📁 Escolher foto da galeria';
+  const input = document.getElementById('svcImgInput');
+  if(input) input.value = '';
 }
 async function saveService(){
   const name = document.getElementById('svcFormName').value.trim();
   const cat = document.getElementById('svcFormCat').value;
   const duration = Number(document.getElementById('svcFormDuration').value);
   const price = Number(document.getElementById('svcFormPrice').value);
-  const imageUrl = document.getElementById('svcFormImage').value.trim();
+  const imageUrl = svcImageData || '';
   if(!name){ toast('Digite o nome do serviço'); return; }
   if(!duration || duration <= 0){ toast('Informe uma duração válida'); return; }
   if(price < 0){ toast('Informe um preço válido'); return; }
