@@ -1022,26 +1022,6 @@ function selectProf(id){
   renderProfessionals(); renderSlots(); updateConfirmBtn();
 }
 
-function renderDateStrip(){
-  const wrap = document.getElementById('dateRow');
-  let html = '';
-  for(let i=0;i<10;i++){
-    const iso = isoOffset(i);
-    const d = new Date(iso+'T00:00');
-    const dow = d.getDay();
-    const closed = businessConfig.hours[dow].closed;
-    html += `<div class="date-chip ${iso===state.selectedDate?'active':''} ${closed?'closed':''}"
-                  onclick="${closed?'':`selectDate('${iso}')`}">
-                <span>${weekdayLabel[dow]}</span><strong>${String(d.getDate()).padStart(2,'0')}</strong>
-              </div>`;
-  }
-  wrap.innerHTML = html;
-}
-function selectDate(iso){
-  state.selectedDate = iso; state.selectedSlot = null;
-  renderDateStrip(); renderSlots(); updateConfirmBtn();
-}
-
 function generateSlots(dateIso, profId){
   const dow = new Date(dateIso+'T00:00').getDay();
   const cfg = businessConfig.hours[dow];
@@ -1051,6 +1031,13 @@ function generateSlots(dateIso, profId){
   const [bsh,bsm] = businessConfig.breakStart.split(':').map(Number);
   const [beh,bem] = businessConfig.breakEnd.split(':').map(Number);
   const start = oh*60+om, end = ch*60+cm, bStart = bsh*60+bsm, bEnd = beh*60+bem;
+
+  // Para o dia de hoje, ignora slots que já passaram (com 30min de antecedência)
+  const today = isoOffset(0);
+  const now = new Date();
+  const nowMin = now.getHours()*60 + now.getMinutes() + 30;
+  const isToday = dateIso === today;
+
   let cur = start, slots = [];
   while(cur + businessConfig.interval <= end){
     const h = String(Math.floor(cur/60)).padStart(2,'0');
@@ -1058,10 +1045,62 @@ function generateSlots(dateIso, profId){
     const time = `${h}:${m}`;
     const onBreak = cur >= bStart && cur < bEnd;
     const taken = bookings.some(b => b.profId===profId && b.date===dateIso && b.time===time);
-    slots.push({time, available: !onBreak && !taken});
+    const pastToday = isToday && cur < nowMin;
+    slots.push({time, available: !onBreak && !taken && !pastToday});
     cur += businessConfig.interval;
   }
   return slots;
+}
+
+function renderDateStrip(){
+  const wrap = document.getElementById('dateRow');
+  let html = '';
+  // Verifica se hoje ainda tem slots disponíveis (considerando hora atual)
+  const now = new Date();
+  const nowMin = now.getHours()*60 + now.getMinutes() + 30;
+
+  for(let i=0;i<10;i++){
+    const iso = isoOffset(i);
+    const d = new Date(iso+'T00:00');
+    const dow = d.getDay();
+    const cfg = businessConfig.hours[dow];
+    const closed = cfg.closed;
+
+    // Para hoje, verifica se ainda tem algum slot futuro disponível
+    let semSlot = false;
+    if(!closed && i === 0){
+      const [ch,cm] = cfg.close.split(':').map(Number);
+      const closeMin = ch*60+cm;
+      semSlot = nowMin >= closeMin; // todos os slots passaram
+    }
+
+    const disable = closed || semSlot;
+    html += `<div class="date-chip ${iso===state.selectedDate?'active':''} ${disable?'closed':''}"
+                  onclick="${disable?'':`selectDate('${iso}')`}">
+                <span>${weekdayLabel[dow]}</span><strong>${String(d.getDate()).padStart(2,'0')}</strong>
+              </div>`;
+  }
+  wrap.innerHTML = html;
+
+  // Se o dia selecionado não tem mais slots (virou passado), avança pro próximo disponível
+  if(state.selectedDate === isoOffset(0)){
+    const dow0 = new Date(isoOffset(0)+'T00:00').getDay();
+    const cfg0 = businessConfig.hours[dow0];
+    if(cfg0 && !cfg0.closed){
+      const [ch,cm] = cfg0.close.split(':').map(Number);
+      if(nowMin >= ch*60+cm){
+        // Hoje não tem mais slot — avança pro próximo dia aberto
+        for(let i=1;i<10;i++){
+          const iso = isoOffset(i);
+          const dow = new Date(iso+'T00:00').getDay();
+          if(!businessConfig.hours[dow].closed){
+            state.selectedDate = iso;
+            break;
+          }
+        }
+      }
+    }
+  }
 }
 
 function renderSlots(){
