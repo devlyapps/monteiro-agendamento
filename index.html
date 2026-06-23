@@ -645,6 +645,16 @@
     <div class="admin-tab" id="adminTab-agenda" style="display:none;">
       <div class="admin-block"><h3>Agenda por colaborador</h3></div>
       <div class="chip-row" id="agendaStaffChips"></div>
+      <div class="admin-day" style="margin-top:14px;">
+        <div class="admin-times">
+          <div class="field"><label>De</label><input id="agendaDateFrom" type="date" onchange="renderAgendaApptList()"></div>
+          <div class="field"><label>Até</label><input id="agendaDateTo" type="date" onchange="renderAgendaApptList()"></div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:12px;">
+          <button class="btn btn-gold" style="flex:1; padding:11px;" onclick="renderAgendaApptList()">🔍 Filtrar</button>
+          <button class="btn btn-ghost" style="flex:1; padding:11px;" onclick="clearAgendaFilters()">✕ Limpar</button>
+        </div>
+      </div>
       <div id="agendaApptList"></div>
     </div>
 
@@ -1595,40 +1605,50 @@ function selectAgendaStaff(id){
   renderAgendaStaffChips();
   renderAgendaApptList();
 }
+function clearAgendaFilters(){
+  document.getElementById('agendaDateFrom').value = '';
+  document.getElementById('agendaDateTo').value = '';
+  renderAgendaApptList();
+}
 function renderAgendaApptList(){
   const wrap = document.getElementById('agendaApptList');
   if(!selectedAgendaStaff){
     wrap.innerHTML = `<div class="empty-note">Selecione um colaborador para ver a agenda.</div>`;
     return;
   }
-  const list = bookings
-    .filter(b => b.profId === selectedAgendaStaff)
-    .sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const dateFrom = document.getElementById('agendaDateFrom') ? document.getElementById('agendaDateFrom').value : '';
+  const dateTo   = document.getElementById('agendaDateTo')   ? document.getElementById('agendaDateTo').value   : '';
+  let list = bookings.filter(b => b.profId === selectedAgendaStaff);
+  if(dateFrom) list = list.filter(b => b.date >= dateFrom);
+  if(dateTo)   list = list.filter(b => b.date <= dateTo);
+  // Ordem crescente por data e hora
+  list.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
   if(!list.length){
-    wrap.innerHTML = `<div class="empty-note">Sem agendamentos para este colaborador.</div>`;
+    wrap.innerHTML = `<div class="empty-note">Sem agendamentos para este período.</div>`;
     return;
   }
   wrap.innerHTML = list.map(b => {
     const s = services.find(x => x.id === b.serviceId);
-    // Corrige data que pode vir como objeto Date do Sheets
     let dateStr = b.date;
     if(!dateStr || String(dateStr).includes('T')){
       try{ dateStr = new Date(dateStr).toISOString().slice(0,10); } catch(e){ dateStr = null; }
     }
-    // Corrige hora que pode vir como objeto Date do Sheets
     let timeStr = toHHmm(b.time);
     const d = dateStr ? new Date(dateStr + 'T00:00') : null;
     const dayLabel = d ? weekdayLabel[d.getDay()] : '—';
-    const dayNum = d ? String(d.getDate()).padStart(2,'0') : '—';
-    const phone = String(b.clientPhone || '').replace(/\D/g,'');
-    const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Monteiro Barbearia. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dayLabel}, dia ${dayNum}, as ${timeStr}. Aguardamos voce!`);
-    const waLink = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
+    const dayNum   = d ? String(d.getDate()).padStart(2,'0') : '—';
+    const phone    = String(b.clientPhone || '').replace(/\D/g,'');
+    const waMsg    = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Monteiro Barbearia. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dayLabel}, dia ${dayNum}, as ${timeStr}. Aguardamos voce!`);
+    const waLink   = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
+    const payLabel = b.payment || '';
+    const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '';
     return `
       <div class="appt-card">
         <div class="appt-date"><span>${dayLabel}</span><strong>${dayNum}</strong></div>
         <div class="appt-info">
           <h3>${b.clientName || 'Cliente'}</h3>
-          <p>${s ? s.name : 'Serviço'} · ${timeStr}</p>
+          ${phoneFormatted ? `<p><a href="tel:+55${phone}" style="color:var(--red-bright); text-decoration:none; font-size:.82rem;">${phoneFormatted}</a></p>` : ''}
+          <p>${s ? s.name : 'Serviço'} · ${timeStr}${payLabel ? ` · ${payLabel}` : ''}</p>
         </div>
         <div class="appt-side">
           <div class="appt-status">Confirmado</div>
