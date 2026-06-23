@@ -1607,13 +1607,22 @@ function renderAgendaApptList(){
   }
   wrap.innerHTML = list.map(b => {
     const s = services.find(x => x.id === b.serviceId);
-    const d = new Date(b.date + 'T00:00');
+    // Corrige data que pode vir como objeto Date do Sheets
+    let dateStr = b.date;
+    if(!dateStr || String(dateStr).includes('T')){
+      try{ dateStr = new Date(dateStr).toISOString().slice(0,10); } catch(e){ dateStr = null; }
+    }
+    // Corrige hora que pode vir como objeto Date do Sheets
+    let timeStr = toHHmm(b.time);
+    const d = dateStr ? new Date(dateStr + 'T00:00') : null;
+    const dayLabel = d ? weekdayLabel[d.getDay()] : '—';
+    const dayNum = d ? String(d.getDate()).padStart(2,'0') : '—';
     return `
       <div class="appt-card">
-        <div class="appt-date"><span>${weekdayLabel[d.getDay()]}</span><strong>${String(d.getDate()).padStart(2,'0')}</strong></div>
+        <div class="appt-date"><span>${dayLabel}</span><strong>${dayNum}</strong></div>
         <div class="appt-info">
           <h3>${b.clientName || 'Cliente'}</h3>
-          <p>${s ? s.name : 'Serviço'} · ${b.time}</p>
+          <p>${s ? s.name : 'Serviço'} · ${timeStr}</p>
         </div>
         <div class="appt-side">
           <div class="appt-status">Confirmado</div>
