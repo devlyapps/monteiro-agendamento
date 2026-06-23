@@ -317,17 +317,22 @@
 
   /* ---------- APPOINTMENTS ---------- */
   .appt-card{
-    margin:0 22px 14px; padding:16px; border-radius:var(--radius); background:var(--surface);
-    border:1px solid rgba(196,60,45,.12); display:flex; gap:14px; align-items:center;
+    margin:0 22px 14px; padding:14px 16px; border-radius:var(--radius); background:var(--surface);
+    border:1px solid rgba(196,60,45,.12); display:flex; flex-direction:column; gap:10px;
   }
+  .appt-card-top{display:flex; align-items:center; gap:12px;}
   .appt-date{
-    flex:none; width:54px; text-align:center; border-right:1px solid var(--red-dim); padding-right:14px;
+    flex:none; width:46px; height:46px; border-radius:10px;
+    background:rgba(196,60,45,.12); display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
   }
-  .appt-date span{display:block; font-size:.62rem; color:var(--muted); text-transform:uppercase;}
-  .appt-date strong{display:block; font-family:'Playfair Display',serif; font-size:1.3rem; color:var(--red-bright);}
-  .appt-info{flex:1;}
-  .appt-info h3{font-size:.95rem; margin-bottom:3px;}
+  .appt-date span{display:block; font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em;}
+  .appt-date strong{display:block; font-family:'Playfair Display',serif; font-size:1.15rem; color:var(--red-bright); line-height:1;}
+  .appt-info{flex:1; min-width:0;}
+  .appt-info h3{font-size:.95rem; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .appt-info .appt-phone{font-size:.8rem; color:var(--red-bright); text-decoration:none; display:block; margin-bottom:2px;}
   .appt-info p{font-size:.76rem; color:var(--muted);}
+  .appt-card-bottom{display:flex; align-items:center; justify-content:space-between; padding-top:8px; border-top:1px solid rgba(196,60,45,.08);}
   .appt-status{
     font-size:.62rem; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:.06em;
     background:rgba(111,165,122,.15); color:var(--ok); flex:none;
@@ -1644,22 +1649,26 @@ function renderAgendaApptList(){
     const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '';
     return `
       <div class="appt-card">
-        <div class="appt-date"><span>${dayLabel}</span><strong>${dayNum}</strong></div>
-        <div class="appt-info">
-          <h3>${b.clientName || 'Cliente'}</h3>
-          ${phoneFormatted ? `<p><a href="tel:+55${phone}" style="color:var(--red-bright); text-decoration:none; font-size:.82rem;">${phoneFormatted}</a></p>` : ''}
-          <p>${s ? s.name : 'Serviço'} · ${timeStr}${payLabel ? ` · ${payLabel}` : ''}</p>
+        <div class="appt-card-top">
+          <div class="appt-date"><span>${dayLabel}</span><strong>${dayNum}</strong></div>
+          <div class="appt-info">
+            <h3>${b.clientName || 'Cliente'}</h3>
+            ${phoneFormatted ? `<a href="tel:+55${phone}" class="appt-phone">${phoneFormatted}</a>` : ''}
+            <p>${s ? s.name : 'Serviço'} · ${timeStr}${payLabel ? ` · ${payLabel}` : ''}</p>
+          </div>
         </div>
-        <div class="appt-side">
+        <div class="appt-card-bottom">
           <div class="appt-status">Confirmado</div>
           <strong class="appt-value">R$ ${s ? s.price : 0}</strong>
+          <div style="display:flex; gap:8px;">
+            ${waLink ? `<button class="icon-btn small" onclick="event.stopPropagation(); openWhatsApp('${waLink}')" title="Enviar lembrete via WhatsApp" style="color:#25D366;">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            </button>` : ''}
+            <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})" title="Cancelar agendamento">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
+            </button>
+          </div>
         </div>
-        ${waLink ? `<button class="icon-btn small" onclick="event.stopPropagation(); openWhatsApp('${waLink}')" title="Enviar lembrete via WhatsApp" style="color:#25D366;">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-        </button>` : ''}
-        <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})" title="Cancelar agendamento">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
-        </button>
       </div>
     `;
   }).join('');
