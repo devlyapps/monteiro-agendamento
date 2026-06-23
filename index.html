@@ -260,6 +260,16 @@
   .date-chip.closed{opacity:.3; cursor:not-allowed;}
 
   .slot-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; padding:0 22px 24px;}
+  .payment-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; padding:0 22px 8px;}
+  .payment-chip{
+    background:var(--surface); border:1.5px solid rgba(196,60,45,.25);
+    border-radius:var(--radius); padding:14px 10px; text-align:center;
+    font-size:.9rem; color:var(--cream); cursor:pointer; transition:all .15s;
+  }
+  .payment-chip.active{
+    border-color:var(--red); background:rgba(196,60,45,.15);
+    color:var(--red-bright); font-weight:600;
+  }
   .slot{
     padding:12px 0; text-align:center; border-radius:12px; font-size:.88rem;
     border:1px solid rgba(196,60,45,.18); color:var(--cream); cursor:pointer; background:var(--surface);
@@ -526,6 +536,14 @@
     <div class="section-label"><span>Horário</span><div class="line"></div></div>
     <div id="slotWrap"></div>
 
+    <div class="section-label"><span>Pagamento</span><div class="line"></div></div>
+    <div class="payment-grid">
+      <div class="payment-chip" onclick="selectPayment('Pix')" id="pay-Pix">💠 Pix</div>
+      <div class="payment-chip" onclick="selectPayment('Crédito')" id="pay-Crédito">💳 Crédito</div>
+      <div class="payment-chip" onclick="selectPayment('Débito')" id="pay-Débito">💳 Débito</div>
+      <div class="payment-chip" onclick="selectPayment('Dinheiro')" id="pay-Dinheiro">💵 Dinheiro</div>
+    </div>
+
     <div style="height:90px;"></div>
 
     <div class="sticky-bar">
@@ -632,7 +650,7 @@
 
     <!-- TAB: CAIXA -->
     <div class="admin-tab" id="adminTab-caixa" style="display:none;">
-      <div class="admin-block"><h3>Caixa · Serviços realizados</h3></div>
+      <div class="admin-block"><h3>Caixa · Serviços do dia</h3></div>
 
       <div class="admin-day">
         <div class="admin-times">
@@ -643,10 +661,13 @@
           <label>Colaborador</label>
           <select id="caixaProfFilter" onchange="applyCaixaFilters()"></select>
         </div>
-        <button class="btn-text" style="margin-top:12px;" onclick="clearCaixaFilters()">Limpar filtros</button>
+        <div style="display:flex; gap:10px; margin-top:14px;">
+          <button class="btn btn-gold" style="flex:1; padding:12px;" onclick="applyCaixaFilters()">🔍 Filtrar</button>
+          <button class="btn btn-ghost" style="flex:1; padding:12px;" onclick="clearCaixaFilters()">✕ Limpar filtro</button>
+        </div>
       </div>
 
-      <div class="section-label" style="margin-top:18px;"><span id="caixaCount">0 serviços</span><div class="line"></div></div>
+      <div class="section-label" style="margin-top:18px;"><span id="caixaCount">Serviços do dia:</span><div class="line"></div></div>
       <div class="service-list" id="caixaList"></div>
 
       <div class="summary-chip" style="margin-top:6px;">
@@ -807,7 +828,7 @@ let bookings = [];
 let state = {
   loggedIn:false, isAdmin:false, userName:'Cliente', userPhone:null,
   activeCategory:'Todos',
-  selectedService:null, selectedProf:null, selectedDate:null, selectedSlot:null,
+  selectedService:null, selectedProf:null, selectedDate:null, selectedSlot:null, selectedPayment:null,
 };
 let editingStaffId = null;
 let editingServiceId = null;
@@ -989,6 +1010,7 @@ function openBooking(serviceId){
   state.selectedProf = eligible.length ? eligible[0].id : null;
   state.selectedDate = isoOffset(0);
   state.selectedSlot = null;
+  state.selectedPayment = null;
 
   document.getElementById('bkServiceName').textContent = state.selectedService.name;
   document.getElementById('bkServiceMeta').textContent = `${state.selectedService.duration} min · ${state.selectedService.cat}`;
@@ -1123,8 +1145,15 @@ function selectSlot(time){
   state.selectedSlot = time;
   renderSlots(); updateConfirmBtn();
 }
+function selectPayment(method){
+  state.selectedPayment = method;
+  document.querySelectorAll('.payment-chip').forEach(c => c.classList.remove('active'));
+  const el = document.getElementById('pay-' + method);
+  if(el) el.classList.add('active');
+  updateConfirmBtn();
+}
 function updateConfirmBtn(){
-  document.getElementById('confirmBtn').disabled = !state.selectedSlot || !state.selectedProf;
+  document.getElementById('confirmBtn').disabled = !state.selectedSlot || !state.selectedProf || !state.selectedPayment;
 }
 
 async function confirmBooking(){
@@ -1136,7 +1165,8 @@ async function confirmBooking(){
     date: state.selectedDate,
     time: state.selectedSlot,
     clientName: state.userName || 'Cliente',
-    clientPhone: state.userPhone || ''
+    clientPhone: state.userPhone || '',
+    payment: state.selectedPayment || 'Não informado'
   };
   toast('Agendando...');
   const res = await apiPost('addBooking', payload);
@@ -1602,6 +1632,12 @@ function renderCaixaTab(){
   profSelect.innerHTML = `<option value="all">Todos os colaboradores</option>` +
     professionals.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
   profSelect.value = caixaFilters.profId;
+  // Padrão: filtrar pelo dia de hoje
+  if(!caixaFilters.dateFrom && !caixaFilters.dateTo){
+    const today = isoOffset(0);
+    caixaFilters.dateFrom = today;
+    caixaFilters.dateTo = today;
+  }
   document.getElementById('caixaDateFrom').value = caixaFilters.dateFrom || '';
   document.getElementById('caixaDateTo').value = caixaFilters.dateTo || '';
   renderCaixaList();
@@ -1613,9 +1649,10 @@ function applyCaixaFilters(){
   renderCaixaList();
 }
 function clearCaixaFilters(){
-  caixaFilters = { dateFrom:null, dateTo:null, profId:'all' };
-  document.getElementById('caixaDateFrom').value = '';
-  document.getElementById('caixaDateTo').value = '';
+  const today = isoOffset(0);
+  caixaFilters = { dateFrom: today, dateTo: today, profId:'all' };
+  document.getElementById('caixaDateFrom').value = today;
+  document.getElementById('caixaDateTo').value = today;
   document.getElementById('caixaProfFilter').value = 'all';
   renderCaixaList();
 }
@@ -1627,19 +1664,34 @@ function renderCaixaList(){
   list.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
 
   const wrap = document.getElementById('caixaList');
+  const count = list.length;
+  document.getElementById('caixaCount').textContent = `Serviços do dia: ${count === 0 ? 'nenhum' : count}`;
+
   if(!list.length){
     wrap.innerHTML = `<div class="empty-note">Nenhum serviço encontrado para o filtro selecionado.</div>`;
   } else {
     wrap.innerHTML = list.map(b => {
       const s = services.find(x => x.id === b.serviceId);
       const p = professionals.find(x => x.id === b.profId);
-      const d = new Date(b.date + 'T00:00');
+      // Corrige datas que vieram como objeto Date do Sheets
+      let dateStr = b.date;
+      if(dateStr instanceof Date || (typeof dateStr === 'string' && dateStr.includes('T'))){
+        try { dateStr = new Date(dateStr).toISOString().slice(0,10); } catch(e){}
+      }
+      let timeStr = b.time;
+      if(timeStr instanceof Date || (typeof timeStr === 'string' && timeStr.includes('T'))){
+        try { const t = new Date(timeStr); timeStr = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`; } catch(e){}
+      }
+      const d = dateStr ? new Date(dateStr + 'T00:00') : null;
+      const dateLabel = d ? `${weekdayLabel[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}` : '—';
+      const payLabel = b.payment ? `💳 ${b.payment}` : '';
       return `
         <div class="service-card">
           <div class="service-bar"></div>
           <div class="service-info">
             <h3>${b.clientName || 'Cliente'}</h3>
-            <p>${s ? s.name : 'Serviço'} · ${p ? p.name : '—'} · ${weekdayLabel[d.getDay()]} ${String(d.getDate()).padStart(2,'0')} · ${b.time}</p>
+            <p>${s ? s.name : 'Serviço'} · ${p ? p.name : '—'} · ${dateLabel} · ${timeStr || '—'}</p>
+            ${payLabel ? `<p style="color:var(--green-bright); font-size:.8rem; margin-top:2px;">${payLabel}</p>` : ''}
           </div>
           <div class="service-price"><strong>R$ ${s ? s.price : 0}</strong></div>
           <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})" title="Cancelar agendamento">
@@ -1654,7 +1706,6 @@ function renderCaixaList(){
     const s = services.find(x => x.id === b.serviceId);
     return sum + (s ? s.price : 0);
   }, 0);
-  document.getElementById('caixaCount').textContent = `${list.length} serviço${list.length === 1 ? '' : 's'}`;
   document.getElementById('caixaTotal').textContent = `R$ ${total}`;
 }
 
