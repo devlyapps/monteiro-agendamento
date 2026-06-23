@@ -1209,7 +1209,8 @@ function closeSuccessModal(){
 function renderAppointments(){
   updateReminderBanner();
   const wrap = document.getElementById('apptList');
-  const mine = bookings.filter(b => b.clientPhone === state.userPhone);
+  const myPhone = String(state.userPhone || '').replace(/\D/g,'');
+  const mine = bookings.filter(b => String(b.clientPhone || '').replace(/\D/g,'') === myPhone);
   const upcoming = [...mine].sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
   if(!upcoming.length){
     wrap.innerHTML = `<div class="empty-note">Você ainda não tem agendamentos.</div>`;
