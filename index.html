@@ -1655,7 +1655,8 @@ function renderAgendaApptList(){
           <div class="appt-info">
             <h3>${b.clientName || 'Cliente'}</h3>
             ${phoneFormatted ? `<a href="tel:+55${phone}" class="appt-phone">${phoneFormatted}</a>` : ''}
-            <p>${s ? s.name : 'Serviço'} · ${timeStr}${payLabel ? ` · ${payLabel}` : ''}</p>
+            <p>${s ? s.name : 'Serviço'} · ${timeStr}</p>
+            ${payLabel ? `<p style="color:var(--green-bright); font-size:.8rem; margin-top:2px;">💳 ${payLabel}</p>` : ''}
           </div>
         </div>
         <div class="appt-card-bottom">
