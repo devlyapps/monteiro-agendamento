@@ -583,7 +583,18 @@
     <div class="prof-row" id="profRow"></div>
 
     <div class="section-label"><span>Data</span><div class="line"></div></div>
-    <div class="date-row" id="dateRow"></div>
+    <div class="cal-wrap" style="margin:0 22px 4px;" id="clientCalWrap">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="clientCalPrev()">‹</button>
+        <span id="clientCalMonthLabel" class="cal-month-label"></span>
+        <button class="cal-nav" onclick="clientCalNext()">›</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+      </div>
+      <div class="cal-grid" id="clientCalGrid"></div>
+      <button class="cal-today-btn" onclick="clientCalToday()">Hoje</button>
+    </div>
 
     <div class="section-label"><span>Horário</span><div class="line"></div></div>
     <div id="slotWrap"></div>
@@ -653,8 +664,13 @@
           <select id="adminInterval">
             <option value="15">15 minutos</option>
             <option value="20">20 minutos</option>
+            <option value="25">25 minutos</option>
             <option value="30" selected>30 minutos</option>
+            <option value="35">35 minutos</option>
+            <option value="40">40 minutos</option>
             <option value="45">45 minutos</option>
+            <option value="50">50 minutos</option>
+            <option value="55">55 minutos</option>
             <option value="60">60 minutos</option>
           </select>
         </div>
@@ -755,18 +771,24 @@
     <div class="admin-tab" id="adminTab-caixa" style="display:none;">
       <div class="admin-block"><h3>Caixa · Serviços do dia</h3></div>
 
-      <div class="admin-day">
-        <div class="admin-times">
-          <div class="field"><label>De</label><input id="caixaDateFrom" type="date" onchange="applyCaixaFilters()"></div>
-          <div class="field"><label>Até</label><input id="caixaDateTo" type="date" onchange="applyCaixaFilters()"></div>
+      <!-- Calendário da Caixa -->
+      <div class="cal-wrap">
+        <div class="cal-header">
+          <button class="cal-nav" onclick="caixaCalPrev()">‹</button>
+          <span id="caixaCalMonthLabel" class="cal-month-label"></span>
+          <button class="cal-nav" onclick="caixaCalNext()">›</button>
         </div>
-        <div class="field" style="margin-top:14px; margin-bottom:0;">
+        <div class="cal-weekdays">
+          <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+        </div>
+        <div class="cal-grid" id="caixaCalGrid"></div>
+        <button class="cal-today-btn" onclick="caixaCalToday()">Hoje</button>
+      </div>
+
+      <div class="admin-day" style="margin-top:14px;">
+        <div class="field" style="margin-bottom:0;">
           <label>Colaborador</label>
-          <select id="caixaProfFilter" onchange="applyCaixaFilters()"></select>
-        </div>
-        <div style="display:flex; gap:10px; margin-top:14px;">
-          <button class="btn btn-gold" style="flex:1; padding:12px;" onclick="applyCaixaFilters()">🔍 Filtrar</button>
-          <button class="btn btn-ghost" style="flex:1; padding:12px;" onclick="clearCaixaFilters()">✕ Limpar filtro</button>
+          <select id="caixaProfFilter" onchange="renderCaixaList()"></select>
         </div>
       </div>
 
@@ -938,7 +960,6 @@ let state = {
 let editingStaffId = null;
 let editingServiceId = null;
 let selectedAgendaStaff = null;
-let caixaFilters = { dateFrom:null, dateTo:null, profId:'all' };
 
 /* ===================== CARREGAMENTO DE DADOS ===================== */
 async function loadData(){
@@ -1116,6 +1137,9 @@ function openBooking(serviceId){
   state.selectedDate = isoOffset(0);
   state.selectedSlot = null;
   state.selectedPayment = null;
+  // Inicializa o calendário do cliente no mês atual
+  clientCalYear  = new Date().getFullYear();
+  clientCalMonth = new Date().getMonth();
 
   document.getElementById('bkServiceName').textContent = state.selectedService.name;
   document.getElementById('bkServiceMeta').textContent = `${state.selectedService.duration} min · ${state.selectedService.cat}`;
@@ -1123,7 +1147,7 @@ function openBooking(serviceId){
   document.getElementById('bkTotal').textContent = `R$ ${state.selectedService.price}`;
 
   renderProfessionals();
-  renderDateStrip();
+  renderClientCal();
   renderSlots();
   updateConfirmBtn();
   showScreen('screen-booking');
@@ -1188,55 +1212,88 @@ function isDateBlocked(iso){
   return ranges.some(r => iso >= r.from && iso <= r.to);
 }
 
-function renderDateStrip(){
-  const wrap = document.getElementById('dateRow');
-  let html = '';
-  const now = new Date();
-  const nowMin = now.getHours()*60 + now.getMinutes() + 30;
-  const maxDays = Number(businessConfig.bookingWindow) || 30;
-  for(let i=0;i<maxDays;i++){
-    const iso = isoOffset(i);
-    const d = new Date(iso+'T00:00');
-    const dow = d.getDay();
-    const cfg = businessConfig.hours[dow];
-    const closed = !cfg || cfg.closed;
-    const blocked = isDateBlocked(iso);
-    let semSlot = false;
-    if(!closed && i === 0){
-      const [ch,cm] = toHHmm(cfg.close).split(':').map(Number);
-      semSlot = nowMin >= ch*60+cm;
-    }
-    const disable = closed || semSlot || blocked;
-    html += `<div class="date-chip ${iso===state.selectedDate?'active':''} ${disable?'closed':''}"
-                  onclick="${disable?'':`selectDate('${iso}')`}">
-                <span>${weekdayLabel[dow]}</span><strong>${String(d.getDate()).padStart(2,'0')}</strong>
-              </div>`;
-  }
-  wrap.innerHTML = html;
-  // Se hoje não tem mais slots, avança pro próximo dia aberto
-  if(state.selectedDate === isoOffset(0)){
-    const dow0 = new Date(isoOffset(0)+'T00:00').getDay();
-    const cfg0 = businessConfig.hours[dow0];
-    if(cfg0 && !cfg0.closed){
-      const [ch,cm] = toHHmm(cfg0.close).split(':').map(Number);
-      if(nowMin >= ch*60+cm){
-        for(let i=1;i<maxDays;i++){
-          const iso = isoOffset(i);
-          const dow = new Date(iso+'T00:00').getDay();
-          if(businessConfig.hours[dow] && !businessConfig.hours[dow].closed && !isDateBlocked(iso)){
-            state.selectedDate = iso;
-            break;
-          }
-        }
-      }
-    }
-  }
-}
+let clientCalYear  = new Date().getFullYear();
+let clientCalMonth = new Date().getMonth();
 
-function selectDate(iso){
-  state.selectedDate = iso; state.selectedSlot = null;
-  renderDateStrip(); renderSlots(); updateConfirmBtn();
+function clientCalPrev(){
+  clientCalMonth--;
+  if(clientCalMonth < 0){ clientCalMonth = 11; clientCalYear--; }
+  renderClientCal();
 }
+function clientCalNext(){
+  clientCalMonth++;
+  if(clientCalMonth > 11){ clientCalMonth = 0; clientCalYear++; }
+  renderClientCal();
+}
+function clientCalToday(){
+  clientCalYear  = new Date().getFullYear();
+  clientCalMonth = new Date().getMonth();
+  state.selectedDate = isoOffset(0);
+  renderClientCal();
+  renderSlots();
+  updateConfirmBtn();
+}
+function renderClientCal(){
+  const label = document.getElementById('clientCalMonthLabel');
+  const grid  = document.getElementById('clientCalGrid');
+  if(!label || !grid) return;
+  label.textContent = `${monthNames[clientCalMonth]} ${clientCalYear}`;
+
+  const today   = isoOffset(0);
+  const maxDays = Number(businessConfig.bookingWindow) || 30;
+  const maxDate = isoOffset(maxDays);
+  const now     = new Date();
+  const nowMin  = now.getHours()*60 + now.getMinutes() + 30;
+
+  const firstDay    = new Date(clientCalYear, clientCalMonth, 1).getDay();
+  const daysInMonth = new Date(clientCalYear, clientCalMonth + 1, 0).getDate();
+  const daysInPrev  = new Date(clientCalYear, clientCalMonth, 0).getDate();
+
+  let html = '';
+  // Dias do mês anterior (cinza)
+  for(let i = firstDay - 1; i >= 0; i--){
+    html += `<div class="cal-day other-month"></div>`;
+  }
+  // Dias do mês atual
+  for(let d = 1; d <= daysInMonth; d++){
+    const iso = `${clientCalYear}-${String(clientCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(iso+'T00:00').getDay();
+    const cfg = businessConfig.hours[dow];
+    const isClosed  = !cfg || cfg.closed;
+    const isBlocked = isDateBlocked(iso);
+    const isPast    = iso < today;
+    const isFuture  = iso > maxDate;
+    // Hoje sem slots disponíveis
+    let noSlots = false;
+    if(iso === today && cfg && !cfg.closed){
+      const [ch,cm] = toHHmm(cfg.close).split(':').map(Number);
+      noSlots = nowMin >= ch*60+cm;
+    }
+    const isSelected = iso === state.selectedDate;
+    const isToday    = iso === today;
+    const disabled   = isClosed || isBlocked || isPast || isFuture || noSlots;
+    let cls = 'cal-day';
+    if(isSelected) cls += ' selected';
+    else if(isToday) cls += ' today';
+    if(disabled) cls += ' closed';
+    html += `<div class="${cls}" onclick="${disabled?'':`clientCalSelectDay('${iso}')`}">${d}</div>`;
+  }
+  // Completar última semana
+  const total = firstDay + daysInMonth;
+  const rem = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for(let d = 1; d <= rem; d++){
+    html += `<div class="cal-day other-month"></div>`;
+  }
+  grid.innerHTML = html;
+}
+function clientCalSelectDay(iso){
+  state.selectedDate = iso;
+  state.selectedSlot = null;
+  renderClientCal();
+  renderSlots();
+  updateConfirmBtn();
+}
+function selectDate(iso){ clientCalSelectDay(iso); }
 
 function renderSlots(){
   const wrap = document.getElementById('slotWrap');
@@ -1911,45 +1968,91 @@ async function saveAdminBooking(){
 }
 
 /* ===================== ADMIN · CAIXA ===================== */
+let caixaCalYear  = new Date().getFullYear();
+let caixaCalMonth = new Date().getMonth();
+let caixaSelectedDate = isoOffset(0);
+
+function caixaCalPrev(){
+  caixaCalMonth--;
+  if(caixaCalMonth < 0){ caixaCalMonth = 11; caixaCalYear--; }
+  renderCaixaCal();
+}
+function caixaCalNext(){
+  caixaCalMonth++;
+  if(caixaCalMonth > 11){ caixaCalMonth = 0; caixaCalYear++; }
+  renderCaixaCal();
+}
+function caixaCalToday(){
+  caixaCalYear  = new Date().getFullYear();
+  caixaCalMonth = new Date().getMonth();
+  caixaSelectedDate = isoOffset(0);
+  renderCaixaCal();
+  renderCaixaList();
+}
+function caixaCalSelectDay(iso){
+  caixaSelectedDate = iso;
+  renderCaixaCal();
+  renderCaixaList();
+}
+function renderCaixaCal(){
+  const label = document.getElementById('caixaCalMonthLabel');
+  const grid  = document.getElementById('caixaCalGrid');
+  if(!label || !grid) return;
+  label.textContent = `${monthNames[caixaCalMonth]} ${caixaCalYear}`;
+
+  const today        = isoOffset(0);
+  const bookedDays   = new Set(bookings.map(b => String(b.date).slice(0,10)));
+  const firstDay     = new Date(caixaCalYear, caixaCalMonth, 1).getDay();
+  const daysInMonth  = new Date(caixaCalYear, caixaCalMonth + 1, 0).getDate();
+  const daysInPrev   = new Date(caixaCalYear, caixaCalMonth, 0).getDate();
+
+  let html = '';
+  for(let i = firstDay - 1; i >= 0; i--){
+    html += `<div class="cal-day other-month"></div>`;
+  }
+  for(let d = 1; d <= daysInMonth; d++){
+    const iso       = `${caixaCalYear}-${String(caixaCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday   = iso === today;
+    const isSel     = iso === caixaSelectedDate;
+    const hasBk     = bookedDays.has(iso);
+    let cls = 'cal-day';
+    if(isSel) cls += ' selected';
+    else if(isToday) cls += ' today';
+    if(hasBk && !isSel) cls += ' has-booking';
+    html += `<div class="${cls}" onclick="caixaCalSelectDay('${iso}')">${d}</div>`;
+  }
+  const total = firstDay + daysInMonth;
+  const rem = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for(let d = 1; d <= rem; d++){
+    html += `<div class="cal-day other-month"></div>`;
+  }
+  grid.innerHTML = html;
+}
 function renderCaixaTab(){
   const profSelect = document.getElementById('caixaProfFilter');
   profSelect.innerHTML = `<option value="all">Todos os colaboradores</option>` +
     professionals.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-  profSelect.value = caixaFilters.profId;
-  // Padrão: filtrar pelo dia de hoje
-  if(!caixaFilters.dateFrom && !caixaFilters.dateTo){
-    const today = isoOffset(0);
-    caixaFilters.dateFrom = today;
-    caixaFilters.dateTo = today;
-  }
-  document.getElementById('caixaDateFrom').value = caixaFilters.dateFrom || '';
-  document.getElementById('caixaDateTo').value = caixaFilters.dateTo || '';
+  caixaCalYear  = new Date().getFullYear();
+  caixaCalMonth = new Date().getMonth();
+  caixaSelectedDate = isoOffset(0);
+  renderCaixaCal();
   renderCaixaList();
 }
-function applyCaixaFilters(){
-  caixaFilters.dateFrom = document.getElementById('caixaDateFrom').value || null;
-  caixaFilters.dateTo = document.getElementById('caixaDateTo').value || null;
-  caixaFilters.profId = document.getElementById('caixaProfFilter').value;
-  renderCaixaList();
-}
+function applyCaixaFilters(){ renderCaixaList(); }
 function clearCaixaFilters(){
-  const today = isoOffset(0);
-  caixaFilters = { dateFrom: today, dateTo: today, profId:'all' };
-  document.getElementById('caixaDateFrom').value = today;
-  document.getElementById('caixaDateTo').value = today;
-  document.getElementById('caixaProfFilter').value = 'all';
-  renderCaixaList();
+  caixaCalToday();
 }
 function renderCaixaList(){
-  let list = [...bookings];
-  if(caixaFilters.profId !== 'all') list = list.filter(b => b.profId === Number(caixaFilters.profId));
-  if(caixaFilters.dateFrom) list = list.filter(b => b.date >= caixaFilters.dateFrom);
-  if(caixaFilters.dateTo) list = list.filter(b => b.date <= caixaFilters.dateTo);
-  list.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const profId = document.getElementById('caixaProfFilter') ? document.getElementById('caixaProfFilter').value : 'all';
+  let list = bookings.filter(b => String(b.date).slice(0,10) === caixaSelectedDate);
+  if(profId !== 'all') list = list.filter(b => b.profId === Number(profId));
+  list.sort((a,b) => String(a.time).localeCompare(String(b.time)));
 
   const wrap = document.getElementById('caixaList');
   const count = list.length;
-  document.getElementById('caixaCount').textContent = `Serviços do dia: ${count === 0 ? 'nenhum' : count}`;
+  const ds = new Date(caixaSelectedDate+'T00:00');
+  const dateLabel = `${weekdayFull[ds.getDay()]}, ${String(ds.getDate()).padStart(2,'0')} de ${monthNames[ds.getMonth()]}`;
+  document.getElementById('caixaCount').textContent = `${dateLabel} · ${count === 0 ? 'nenhum serviço' : count + (count === 1 ? ' serviço' : ' serviços')}`;
 
   if(!list.length){
     wrap.innerHTML = `<div class="empty-note">Nenhum serviço encontrado para o filtro selecionado.</div>`;
