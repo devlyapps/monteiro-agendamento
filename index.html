@@ -409,6 +409,30 @@
   .loyalty-history-info strong{font-size:.88rem; color:var(--cream); display:block;}
   .loyalty-history-info span{font-size:.75rem; color:var(--muted);}
 
+  /* ---------- CARD CLIENTE ---------- */
+  .client-card{
+    margin:0 22px 12px; padding:14px 16px; border-radius:var(--radius);
+    background:var(--surface); border-left:4px solid var(--red-dim);
+    border-top:1px solid rgba(196,60,45,.1); border-right:1px solid rgba(196,60,45,.1); border-bottom:1px solid rgba(196,60,45,.1);
+  }
+  .client-card.green{ border-left-color:#3fae66; }
+  .client-card.yellow{ border-left-color:#d4a017; }
+  .client-card.red{ border-left-color:#e2543a; }
+  .client-card-top{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+  .client-name{ font-size:.95rem; font-weight:600; color:var(--cream); }
+  .client-phone{ font-size:.78rem; color:var(--muted); margin-top:2px; }
+  .client-days-badge{
+    font-size:.72rem; font-weight:700; padding:4px 10px; border-radius:999px; white-space:nowrap; flex:none;
+  }
+  .client-days-badge.green{ background:rgba(63,174,102,.15); color:#6fe3a0; }
+  .client-days-badge.yellow{ background:rgba(212,160,23,.15); color:#f0c040; }
+  .client-days-badge.red{ background:rgba(226,84,58,.15); color:#e2543a; }
+  .client-card-bottom{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .client-loyalty{ font-size:.75rem; color:var(--muted); }
+  .client-loyalty strong{ color:var(--red-bright); }
+
+
+
   /* ---------- CALENDÁRIO AGENDA ---------- */
   .cal-wrap{
     margin:14px 22px 0; background:var(--surface);
@@ -715,6 +739,7 @@
       <div class="chip active" data-tab="hours" onclick="setAdminTab('hours')">Funcionamento</div>
       <div class="chip" data-tab="staff" onclick="setAdminTab('staff')">Colaboradores</div>
       <div class="chip" data-tab="services" onclick="setAdminTab('services')">Serviços</div>
+      <div class="chip" data-tab="clients" onclick="setAdminTab('clients')">Clientes</div>
     </div>
 
     <!-- TAB: FUNCIONAMENTO -->
@@ -866,6 +891,17 @@
         <div><strong>Total no período</strong><p>Soma dos serviços filtrados</p></div>
         <b id="caixaTotal">R$ 0</b>
       </div>
+    </div>
+
+    <!-- TAB: CLIENTES -->
+    <div class="admin-tab" id="adminTab-clients" style="display:none;">
+      <div class="admin-block"><h3>Clientes cadastrados</h3></div>
+      <div style="padding:0 22px 14px;">
+        <input id="clientSearch" type="text" placeholder="Buscar por nome ou telefone..."
+          oninput="renderClientesTab()"
+          style="width:100%; background:var(--surface); border:1px solid var(--red-dim); border-radius:999px; padding:11px 16px; color:var(--cream); font-size:.9rem; outline:none; box-sizing:border-box;">
+      </div>
+      <div id="clientesList"></div>
     </div>
   </section>
 
@@ -1059,6 +1095,7 @@ const weekdayLabel = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const weekdayFull  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 
 let bookings = [];
+let validatedBookingIds = new Set();
 
 let state = {
   loggedIn:false, isAdmin:false, userName:'Cliente', userPhone:null,
@@ -1077,6 +1114,7 @@ async function loadData(){
   professionals = data.professionals;
   businessConfig = data.businessConfig;
   bookings = data.bookings;
+  validatedBookingIds = new Set((data.validatedBookingIds || []).map(String));
 }
 
 function renderHeroHours(){
@@ -1255,6 +1293,7 @@ function doAdminLogin(){
 }
 function enterAdmin(){
   state.isAdmin = true;
+  clientesCache = [];
   document.getElementById('navAdmin').style.display = 'flex';
   document.getElementById('navProfile').style.display = 'none';
   renderAdminDays();
@@ -1586,15 +1625,24 @@ async function cancelBooking(id){
 function openWhatsApp(url){
   window.open(url, '_blank');
 }
-async function validateClientVisit(phone, serviceName, date){
+async function validateClientVisit(phone, serviceName, date, bookingId){
   if(!phone){ toast('Este agendamento não tem telefone cadastrado'); return; }
+  if(validatedBookingIds.has(String(bookingId))){ toast('Esta visita já foi validada'); return; }
   toast('Validando visita...');
-  const res = await apiPost('validateVisit', { phone, serviceName, date });
+  const res = await apiPost('validateVisit', { phone, serviceName, date, bookingId });
+  if(res.error === 'already_validated'){
+    validatedBookingIds.add(String(bookingId));
+    renderAgendaApptList();
+    toast('Esta visita já foi validada anteriormente');
+    return;
+  }
   if(res.error){ toast(res.error); return; }
+  validatedBookingIds.add(String(bookingId));
+  renderAgendaApptList();
   const total = res.total;
-  let msg = `Visita validada! ${serviceName} · Total: ${total}/10`;
-  if(total === 5)  msg += ' — 10% OFF desbloqueado!';
-  if(total >= 10) msg += ' — Serviço GRÁTIS desbloqueado!';
+  let msg = `✓ Visita validada! ${serviceName} · ${total}/10`;
+  if(total === 5)  msg = `⭐ 10% OFF desbloqueado para ${phone}!`;
+  if(total >= 10) msg = `🎉 Serviço GRÁTIS desbloqueado para ${phone}!`;
   toast(msg);
 }
 async function adminCancelBooking(id){
@@ -1669,6 +1717,7 @@ function setAdminTab(tab){
     renderAgendaApptList();
   }
   if(tab === 'caixa'){ renderCaixaTab(); }
+  if(tab === 'clients'){ renderClientesTab(); }
 }
 
 /* ===================== ADMIN · COLABORADORES ===================== */
@@ -2021,10 +2070,13 @@ function renderAgendaApptList(){
         <div class="appt-card-bottom">
           <div class="appt-status">Confirmado</div>
           <strong class="appt-value">R$ ${s ? s.price : 0}</strong>
-          <div style="display:flex; gap:8px;">
-            <button class="icon-btn small" onclick="event.stopPropagation(); validateClientVisit('${String(b.clientPhone||'').replace(/\D/g,'')}','${s?s.name:'Atendimento'}','${agendaSelectedDate}')" title="Validar visita no cartão fidelidade" style="color:var(--green-bright);">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-            </button>
+          <div style="display:flex; gap:8px; align-items:center;">
+            ${validatedBookingIds.has(String(b.id))
+              ? `<span style="font-size:.68rem; color:var(--green-bright); background:rgba(63,174,102,.12); border:1px solid rgba(63,174,102,.3); border-radius:999px; padding:4px 8px; white-space:nowrap;">✓ Validada</span>`
+              : `<button class="icon-btn small" onclick="event.stopPropagation(); validateClientVisit('${String(b.clientPhone||'').replace(/\D/g,'')}','${s?s.name:'Atendimento'}','${agendaSelectedDate}','${b.id}')" title="Validar visita no cartão fidelidade" style="color:var(--green-bright);">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                </button>`
+            }
             ${waLink ? `<button class="icon-btn small" onclick="event.stopPropagation(); openWhatsApp('${waLink}')" title="Enviar lembrete" style="color:#25D366;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg></button>` : ''}
             <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
           </div>
@@ -2168,6 +2220,83 @@ async function saveAdminBooking(){
   renderAgendaStaffChips();
   renderAgendaApptList();
   toast(`Agendamento de ${name} gravado com sucesso!`);
+}
+
+/* ===================== ADMIN · CLIENTES ===================== */
+let clientesCache = [];
+async function renderClientesTab(){
+  const wrap = document.getElementById('clientesList');
+  if(!wrap) return;
+
+  if(!clientesCache.length){
+    wrap.innerHTML = `<div class="empty-note">Carregando...</div>`;
+    const res = await apiPost('getClients', {});
+    if(res.error){ wrap.innerHTML = `<div class="empty-note">Erro ao carregar clientes.</div>`; return; }
+    clientesCache = Array.isArray(res) ? res : [];
+  }
+
+  const q = (document.getElementById('clientSearch')?.value || '').toLowerCase().trim();
+  let list = clientesCache;
+  if(q) list = list.filter(c =>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.phone||'').includes(q.replace(/\D/g,''))
+  );
+
+  if(!list.length){
+    wrap.innerHTML = `<div class="empty-note">Nenhum cliente encontrado.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = list.map(c => {
+    const days = c.daysSinceValidated !== null ? c.daysSinceValidated : c.daysSinceBooking;
+    let colorClass = '';
+    if(days === null)      colorClass = '';
+    else if(days <= 15)   colorClass = 'green';
+    else if(days <= 30)   colorClass = 'yellow';
+    else                  colorClass = 'red';
+
+    const daysLabel = days !== null
+      ? `${days} dia${days !== 1 ? 's' : ''} sem visita`
+      : 'Sem visitas';
+
+    const phone = String(c.phone||'').replace(/\D/g,'');
+    const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '—';
+    const loyalty = c.loyaltyCount || 0;
+    const loyaltyNext = loyalty >= 10 ? '🎉 Grátis!' : loyalty >= 5 ? `${10-loyalty} p/ grátis` : `${5-loyalty} p/ 10% OFF`;
+
+    // Mensagem WhatsApp personalizada
+    let waText = `Ola, ${c.name}! Tudo bem? Passando para lembrar que ja faz ${days} dias desde o seu ultimo atendimento. Saudades de voce aqui na Monteiro Barbearia!`;
+    if(loyalty >= 5 && loyalty < 10){
+      waText += ` Voce esta a ${10-loyalty} visita${10-loyalty>1?'s':''} de ganhar um servico GRATIS!`;
+    } else if(loyalty < 5){
+      waText += ` Voce esta a ${5-loyalty} visita${5-loyalty>1?'s':''} de ganhar 10% OFF!`;
+    } else if(loyalty >= 10){
+      waText += ` Voce ja tem direito a um servico GRATIS!`;
+    }
+    const waLink = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(waText)}` : '';
+
+    return `
+      <div class="client-card ${colorClass}">
+        <div class="client-card-top">
+          <div>
+            <div class="client-name">${c.name || 'Sem nome'}</div>
+            <div class="client-phone">${phoneFormatted}</div>
+          </div>
+          ${days !== null ? `<span class="client-days-badge ${colorClass}">${daysLabel}</span>` : ''}
+        </div>
+        <div class="client-card-bottom">
+          <div class="client-loyalty">
+            Fidelidade: <strong>${loyalty}/10</strong>
+            <span style="color:var(--muted);"> · ${loyaltyNext}</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            ${waLink ? `<button class="icon-btn small" onclick="openWhatsApp('${waLink}')" title="Enviar mensagem" style="color:#25D366;">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            </button>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 /* ===================== ADMIN · CAIXA ===================== */
