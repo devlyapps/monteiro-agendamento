@@ -1273,6 +1273,27 @@ async function doRegister(){
   finishLogin();
   toast('Conta criada com sucesso!');
 }
+const SESSION_KEY = 'monteiro_session_v1';
+function saveSession(){
+  try{
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      isAdmin: state.isAdmin,
+      userName: state.userName,
+      userPhone: state.userPhone,
+    }));
+  } catch(e){}
+}
+function clearSession(){
+  try{ localStorage.removeItem(SESSION_KEY); } catch(e){}
+}
+function restoreSession(){
+  try{
+    const raw = localStorage.getItem(SESSION_KEY);
+    if(!raw) return false;
+    return JSON.parse(raw);
+  } catch(e){ return false; }
+}
+
 function finishLogin(){
   state.loggedIn = true; state.isAdmin = false;
   document.getElementById('homeUserName').textContent = capitalize(state.userName.split(' ')[0]);
@@ -1280,6 +1301,7 @@ function finishLogin(){
   renderCategoryChips(); renderServices();
   showScreen('screen-home'); setNav('home');
   updateReminderBanner();
+  saveSession();
 }
 function doAdminLogin(){
   const u = document.getElementById('adminUser').value.trim();
@@ -1301,6 +1323,7 @@ function enterAdmin(){
   showScreen('screen-admin');
   document.getElementById('bottomNav').style.display = 'flex';
   setNav('admin');
+  saveSession();
 }
 function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 function logoutUser(){
@@ -1308,6 +1331,7 @@ function logoutUser(){
   state.selectedService = null; state.selectedProf = null; state.selectedDate = null; state.selectedSlot = null;
   document.getElementById('navAdmin').style.display = 'none';
   document.getElementById('navProfile').style.display = 'flex';
+  clearSession();
   showScreen('screen-login');
   toast('Você saiu da conta');
 }
@@ -2447,6 +2471,23 @@ async function init(){
   renderCategoryChips();
   renderServices();
   renderAppointments();
+
+  // Restaura sessão salva (mantém logado após recarregar)
+  const session = restoreSession();
+  if(session){
+    state.userName  = session.userName  || 'Cliente';
+    state.userPhone = session.userPhone || null;
+    if(session.isAdmin){
+      enterAdmin();
+    } else {
+      state.loggedIn = true; state.isAdmin = false;
+      document.getElementById('homeUserName').textContent = capitalize((state.userName||'').split(' ')[0]);
+      document.getElementById('navAdmin').style.display = 'none';
+      renderCategoryChips(); renderServices();
+      showScreen('screen-home'); setNav('home');
+      updateReminderBanner();
+    }
+  }
 }
 init();
 
