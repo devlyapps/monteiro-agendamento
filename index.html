@@ -342,6 +342,73 @@
   .appt-actions{padding:0 22px; margin:-4px 0 18px;}
   .link-danger{background:none; border:none; color:var(--danger); font-size:.78rem; cursor:pointer; text-decoration:underline;}
 
+  /* ---------- CARTÃO FIDELIDADE ---------- */
+  .loyalty-card{
+    margin:18px 22px; background:linear-gradient(135deg,#1e0e0a 0%,#2a1208 50%,#1a0a06 100%);
+    border:1px solid rgba(196,60,45,.35); border-radius:20px; padding:22px 20px 18px; overflow:hidden; position:relative;
+  }
+  .loyalty-card::before{
+    content:''; position:absolute; top:-40px; right:-40px; width:160px; height:160px;
+    border-radius:50%; background:rgba(196,60,45,.06); pointer-events:none;
+  }
+  .loyalty-header{display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px;}
+  .loyalty-title{font-family:'Playfair Display',serif; font-size:1.1rem; color:var(--cream); font-weight:600;}
+  .loyalty-sub{font-size:.72rem; color:var(--muted); margin-top:3px; letter-spacing:.08em; text-transform:uppercase;}
+  .loyalty-badge{
+    background:var(--red); color:#fff; font-size:.8rem; font-weight:700;
+    padding:6px 12px; border-radius:999px; letter-spacing:.04em;
+  }
+  .loyalty-progress-wrap{background:rgba(255,255,255,.08); border-radius:999px; height:6px; margin-bottom:10px; overflow:hidden;}
+  .loyalty-progress-bar{height:100%; background:linear-gradient(90deg,var(--red),var(--red-bright)); border-radius:999px; transition:width .6s cubic-bezier(.4,0,.2,1);}
+  .loyalty-next{
+    font-size:.78rem; color:var(--red-bright); margin-bottom:18px;
+    background:rgba(196,60,45,.1); border:1px solid rgba(196,60,45,.2);
+    border-radius:8px; padding:8px 12px; text-align:center; letter-spacing:.02em;
+  }
+  .loyalty-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:14px;}
+  .loyalty-seal{
+    aspect-ratio:1; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    position:relative; flex-direction:column;
+  }
+  .loyalty-seal.empty{
+    border:2px dashed rgba(196,60,45,.3); background:rgba(196,60,45,.04);
+  }
+  .loyalty-seal.filled{
+    background:radial-gradient(circle at 35% 35%, var(--red-bright), var(--red));
+    border:2px solid var(--red-bright); box-shadow:0 4px 14px rgba(196,60,45,.4);
+  }
+  .loyalty-seal.filled svg{width:52%; height:52%; color:#fff;}
+  .loyalty-seal .seal-num{
+    position:absolute; bottom:1px; right:2px; font-size:.52rem;
+    color:rgba(255,255,255,.4); font-weight:700;
+  }
+  .loyalty-seal.filled .seal-num{color:rgba(255,255,255,.7);}
+  .loyalty-seal.special-5 .discount-badge{
+    position:absolute; bottom:-7px; left:50%; transform:translateX(-50%);
+    background:var(--green); color:#0a1f0a; font-size:.55rem; font-weight:800;
+    padding:2px 5px; border-radius:5px; white-space:nowrap; letter-spacing:.04em;
+  }
+  .loyalty-seal.special-10 .discount-badge{
+    position:absolute; bottom:-7px; left:50%; transform:translateX(-50%);
+    background:var(--red-bright); color:#fff; font-size:.52rem; font-weight:800;
+    padding:2px 5px; border-radius:5px; white-space:nowrap; letter-spacing:.04em;
+  }
+  .loyalty-legend{display:flex; align-items:center; font-size:.72rem; color:var(--muted);}
+  .loyalty-dot{display:inline-block; width:8px; height:8px; border-radius:50%; border:1.5px dashed rgba(196,60,45,.4); margin-right:5px;}
+  .loyalty-dot.filled{background:var(--red); border:none;}
+  .loyalty-history-item{
+    display:flex; align-items:center; gap:12px; padding:12px 0;
+    border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .loyalty-history-num{
+    width:28px; height:28px; border-radius:50%; background:var(--red);
+    display:flex; align-items:center; justify-content:center;
+    font-size:.72rem; font-weight:700; color:#fff; flex:none;
+  }
+  .loyalty-history-info{flex:1;}
+  .loyalty-history-info strong{font-size:.88rem; color:var(--cream); display:block;}
+  .loyalty-history-info span{font-size:.75rem; color:var(--muted);}
+
   /* ---------- CALENDÁRIO AGENDA ---------- */
   .cal-wrap{
     margin:14px 22px 0; background:var(--surface);
@@ -803,6 +870,43 @@
   </section>
 
   <!-- ============ BOTTOM NAV ============ -->
+  <!-- ============ PERFIL / FIDELIDADE ============ -->
+  <section class="screen" id="screen-profile" style="display:none;">
+    <div class="topbar">
+      <h2 class="display">Meu Perfil</h2>
+    </div>
+
+    <div class="loyalty-card">
+      <div class="loyalty-header">
+        <div>
+          <div class="loyalty-title">Cartão Fidelidade</div>
+          <div class="loyalty-sub">Monteiro Barbearia</div>
+        </div>
+        <div class="loyalty-badge" id="loyaltyBadge">0/10</div>
+      </div>
+
+      <!-- Barra de progresso -->
+      <div class="loyalty-progress-wrap">
+        <div class="loyalty-progress-bar" id="loyaltyBar" style="width:0%"></div>
+      </div>
+
+      <!-- Banner dinâmico -->
+      <div class="loyalty-next" id="loyaltyNext">Valide visitas para ganhar recompensas</div>
+
+      <!-- Grade de selos -->
+      <div class="loyalty-grid" id="loyaltyGrid"></div>
+
+      <div class="loyalty-legend">
+        <span class="loyalty-dot filled"></span> Visita validada &nbsp;&nbsp;
+        <span class="loyalty-dot"></span> Aguardando
+      </div>
+    </div>
+
+    <!-- Histórico de visitas -->
+    <div class="section-label" style="margin-top:22px;"><span>Histórico de visitas</span><div class="line"></div></div>
+    <div id="loyaltyHistory" style="padding:0 22px;"></div>
+  </section>
+
   <nav class="bottom-nav" id="bottomNav">
     <button class="nav-item active" id="navHome" onclick="showScreen('screen-home'); setNav('home')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
@@ -811,6 +915,10 @@
     <button class="nav-item" id="navAppt" onclick="showScreen('screen-appointments'); setNav('appointments')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M12 3a9 9 0 100 18 9 9 0 000-18z"/></svg>
       <span>Horários</span>
+    </button>
+    <button class="nav-item" id="navProfile" onclick="showScreen('screen-profile'); setNav('profile'); loadLoyalty()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      <span>Perfil</span>
     </button>
     <button class="nav-item" id="navAdmin" onclick="showScreen('screen-admin'); setNav('admin')" style="display:none;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/></svg>
@@ -1008,7 +1116,86 @@ function setNav(which){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(which==='home') document.getElementById('navHome').classList.add('active');
   if(which==='appointments') document.getElementById('navAppt').classList.add('active');
+  if(which==='profile') document.getElementById('navProfile').classList.add('active');
   if(which==='admin') document.getElementById('navAdmin').classList.add('active');
+}
+
+/* ===================== CARTÃO FIDELIDADE ===================== */
+const LOYALTY_TOTAL = 10;
+
+async function loadLoyalty(){
+  if(!state.userPhone) return;
+  const res = await apiPost('getLoyalty', { phone: state.userPhone });
+  if(res.error){ console.warn(res.error); renderLoyaltyCard(0, []); return; }
+  renderLoyaltyCard(res.total || 0, res.visits || []);
+}
+
+function renderLoyaltyCard(total, visits){
+  // Badge
+  document.getElementById('loyaltyBadge').textContent = `${total}/${LOYALTY_TOTAL}`;
+  // Barra de progresso
+  const pct = Math.min((total / LOYALTY_TOTAL) * 100, 100);
+  document.getElementById('loyaltyBar').style.width = pct + '%';
+  // Banner dinâmico
+  const nextEl = document.getElementById('loyaltyNext');
+  if(total >= LOYALTY_TOTAL){
+    nextEl.textContent = '🎉 Parabéns! Você ganhou um serviço GRÁTIS!';
+    nextEl.style.background = 'rgba(63,174,102,.15)';
+    nextEl.style.borderColor = 'rgba(63,174,102,.4)';
+    nextEl.style.color = 'var(--green-bright)';
+  } else if(total >= 5){
+    const rem = LOYALTY_TOTAL - total;
+    nextEl.textContent = `Faltam ${rem} visita${rem>1?'s':''} para seu serviço GRÁTIS!`;
+    nextEl.style.background = 'rgba(196,60,45,.1)';
+    nextEl.style.borderColor = 'rgba(196,60,45,.2)';
+    nextEl.style.color = 'var(--red-bright)';
+  } else {
+    const rem5 = 5 - total;
+    nextEl.textContent = `Faltam ${rem5} visita${rem5>1?'s':''} para 10% OFF no seu próximo corte!`;
+    nextEl.style.background = 'rgba(196,60,45,.1)';
+    nextEl.style.borderColor = 'rgba(196,60,45,.2)';
+    nextEl.style.color = 'var(--red-bright)';
+  }
+  // Grade de selos
+  const grid = document.getElementById('loyaltyGrid');
+  let html = '';
+  for(let i = 1; i <= LOYALTY_TOTAL; i++){
+    const filled = i <= total;
+    const is5  = i === 5;
+    const is10 = i === 10;
+    let cls = `loyalty-seal ${filled ? 'filled' : 'empty'}`;
+    if(is5)  cls += ' special-5';
+    if(is10) cls += ' special-10';
+    const icon = filled
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+           <circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/>
+           <path d="M8.5 8L20 19M8.5 16L20 5M6 8.5v7"/>
+         </svg>`
+      : '';
+    const badge = is5  ? `<span class="discount-badge">10% OFF</span>` :
+                  is10 ? `<span class="discount-badge">GRÁTIS</span>` : '';
+    html += `<div class="${cls}">${icon}<span class="seal-num">${i}</span>${badge}</div>`;
+  }
+  grid.innerHTML = html;
+  // Histórico
+  const histEl = document.getElementById('loyaltyHistory');
+  if(!visits.length){
+    histEl.innerHTML = `<div class="empty-note" style="padding:0;">Nenhuma visita validada ainda.</div>`;
+    return;
+  }
+  histEl.innerHTML = [...visits].reverse().map((v, idx) => {
+    const num = visits.length - idx;
+    const d = new Date(v.date + 'T00:00');
+    const dateStr = `${weekdayLabel[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    return `
+      <div class="loyalty-history-item">
+        <div class="loyalty-history-num">${num}</div>
+        <div class="loyalty-history-info">
+          <strong>${v.serviceName || 'Atendimento'}</strong>
+          <span>${dateStr}</span>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 /* ===================== AUTH (celular + senha) ===================== */
@@ -1069,6 +1256,7 @@ function doAdminLogin(){
 function enterAdmin(){
   state.isAdmin = true;
   document.getElementById('navAdmin').style.display = 'flex';
+  document.getElementById('navProfile').style.display = 'none';
   renderAdminDays();
   setAdminTab('hours');
   showScreen('screen-admin');
@@ -1080,6 +1268,7 @@ function logoutUser(){
   state.loggedIn = false; state.isAdmin = false; state.userPhone = null;
   state.selectedService = null; state.selectedProf = null; state.selectedDate = null; state.selectedSlot = null;
   document.getElementById('navAdmin').style.display = 'none';
+  document.getElementById('navProfile').style.display = 'flex';
   showScreen('screen-login');
   toast('Você saiu da conta');
 }
@@ -1396,6 +1585,17 @@ async function cancelBooking(id){
 }
 function openWhatsApp(url){
   window.open(url, '_blank');
+}
+async function validateClientVisit(phone, serviceName, date){
+  if(!phone){ toast('Este agendamento não tem telefone cadastrado'); return; }
+  toast('Validando visita...');
+  const res = await apiPost('validateVisit', { phone, serviceName, date });
+  if(res.error){ toast(res.error); return; }
+  const total = res.total;
+  let msg = `Visita validada! ${serviceName} · Total: ${total}/10`;
+  if(total === 5)  msg += ' — 10% OFF desbloqueado!';
+  if(total >= 10) msg += ' — Serviço GRÁTIS desbloqueado!';
+  toast(msg);
 }
 async function adminCancelBooking(id){
   const res = await apiPost('cancelBooking', { id });
@@ -1822,6 +2022,9 @@ function renderAgendaApptList(){
           <div class="appt-status">Confirmado</div>
           <strong class="appt-value">R$ ${s ? s.price : 0}</strong>
           <div style="display:flex; gap:8px;">
+            <button class="icon-btn small" onclick="event.stopPropagation(); validateClientVisit('${String(b.clientPhone||'').replace(/\D/g,'')}','${s?s.name:'Atendimento'}','${agendaSelectedDate}')" title="Validar visita no cartão fidelidade" style="color:var(--green-bright);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            </button>
             ${waLink ? `<button class="icon-btn small" onclick="event.stopPropagation(); openWhatsApp('${waLink}')" title="Enviar lembrete" style="color:#25D366;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg></button>` : ''}
             <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
           </div>
