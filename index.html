@@ -342,6 +342,53 @@
   .appt-actions{padding:0 22px; margin:-4px 0 18px;}
   .link-danger{background:none; border:none; color:var(--danger); font-size:.78rem; cursor:pointer; text-decoration:underline;}
 
+  /* ---------- CALENDÁRIO AGENDA ---------- */
+  .cal-wrap{
+    margin:14px 22px 0; background:var(--surface);
+    border:1px solid rgba(196,60,45,.15); border-radius:var(--radius); overflow:hidden;
+  }
+  .cal-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px; border-bottom:1px solid rgba(196,60,45,.1);
+  }
+  .cal-nav{
+    background:none; border:none; color:var(--cream); font-size:1.4rem;
+    cursor:pointer; padding:4px 10px; border-radius:8px;
+    transition:background .15s;
+  }
+  .cal-nav:active{ background:rgba(196,60,45,.2); }
+  .cal-month-label{ font-family:'Playfair Display',serif; font-size:1.05rem; color:var(--cream); font-weight:600; }
+  .cal-weekdays{
+    display:grid; grid-template-columns:repeat(7,1fr);
+    padding:8px 10px 4px; text-align:center;
+  }
+  .cal-weekdays span{ font-size:.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  .cal-grid{
+    display:grid; grid-template-columns:repeat(7,1fr);
+    padding:4px 10px 10px; gap:3px;
+  }
+  .cal-day{
+    aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    border-radius:50%; font-size:.85rem; cursor:pointer; color:var(--cream);
+    position:relative; transition:background .15s;
+  }
+  .cal-day:active{ background:rgba(196,60,45,.25); }
+  .cal-day.other-month{ color:rgba(255,255,255,.2); }
+  .cal-day.has-booking::after{
+    content:''; position:absolute; bottom:3px; left:50%; transform:translateX(-50%);
+    width:5px; height:5px; border-radius:50%; background:var(--red);
+  }
+  .cal-day.today{ border:1.5px solid rgba(196,60,45,.5); }
+  .cal-day.selected{ background:var(--red) !important; color:#fff !important; font-weight:700; }
+  .cal-day.selected::after{ display:none; }
+  .cal-day.closed{ color:rgba(255,255,255,.15); cursor:default; }
+  .cal-today-btn{
+    display:block; width:calc(100% - 32px); margin:0 16px 12px;
+    background:rgba(196,60,45,.1); border:1px solid rgba(196,60,45,.25);
+    color:var(--red-bright); border-radius:var(--radius); padding:8px;
+    font-size:.82rem; cursor:pointer; text-align:center;
+  }
+
   /* ---------- ADMIN ---------- */
   .admin-day{
     margin:0 22px 12px; padding:14px 16px; border-radius:var(--radius-sm); background:var(--surface);
@@ -650,15 +697,24 @@
     <div class="admin-tab" id="adminTab-agenda" style="display:none;">
       <div class="admin-block"><h3>Agenda por colaborador</h3></div>
       <div class="chip-row" id="agendaStaffChips"></div>
-      <div class="admin-day" style="margin-top:14px;">
-        <div class="admin-times">
-          <div class="field"><label>De</label><input id="agendaDateFrom" type="date" onchange="renderAgendaApptList()"></div>
-          <div class="field"><label>Até</label><input id="agendaDateTo" type="date" onchange="renderAgendaApptList()"></div>
+
+      <!-- Calendário mensal -->
+      <div class="cal-wrap">
+        <div class="cal-header">
+          <button class="cal-nav" onclick="agendaCalPrev()">‹</button>
+          <span id="calMonthLabel" class="cal-month-label"></span>
+          <button class="cal-nav" onclick="agendaCalNext()">›</button>
         </div>
-        <div style="display:flex; gap:10px; margin-top:12px;">
-          <button class="btn btn-gold" style="flex:1; padding:11px;" onclick="renderAgendaApptList()">🔍 Filtrar</button>
-          <button class="btn btn-ghost" style="flex:1; padding:11px;" onclick="clearAgendaFilters()">✕ Limpar</button>
+        <div class="cal-weekdays">
+          <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
         </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <button class="cal-today-btn" onclick="agendaCalToday()">Hoje</button>
+      </div>
+
+      <div class="section-label" style="margin-top:4px;">
+        <span id="agendaDateLabel">Selecione um dia</span>
+        <div class="line"></div>
       </div>
       <div id="agendaApptList"></div>
     </div>
@@ -1595,57 +1651,58 @@ async function deleteService(id){
 }
 
 /* ===================== ADMIN · AGENDA POR COLABORADOR ===================== */
+let agendaCalYear  = new Date().getFullYear();
+let agendaCalMonth = new Date().getMonth();
+let agendaSelectedDate = isoOffset(0);
+const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 function renderAgendaStaffChips(){
   const wrap = document.getElementById('agendaStaffChips');
-  if(!professionals.length){
-    wrap.innerHTML = '';
-    document.getElementById('agendaApptList').innerHTML = `<div class="empty-note">Cadastre um colaborador para ver a agenda.</div>`;
-    return;
-  }
-  wrap.innerHTML = professionals.map(p => `
-    <div class="chip ${p.id === selectedAgendaStaff ? 'active' : ''}" onclick="selectAgendaStaff(${p.id})">${p.name}</div>
-  `).join('');
+  if(!professionals.length){ wrap.innerHTML = ''; document.getElementById('agendaApptList').innerHTML = `<div class="empty-note">Cadastre um colaborador.</div>`; return; }
+  wrap.innerHTML = professionals.map(p => `<div class="chip ${p.id === selectedAgendaStaff ? 'active' : ''}" onclick="selectAgendaStaff(${p.id})">${p.name}</div>`).join('');
 }
-function selectAgendaStaff(id){
-  selectedAgendaStaff = id;
-  renderAgendaStaffChips();
-  renderAgendaApptList();
+function selectAgendaStaff(id){ selectedAgendaStaff = id; renderAgendaStaffChips(); renderAgendaCal(); renderAgendaApptList(); }
+function agendaCalPrev(){ agendaCalMonth--; if(agendaCalMonth<0){agendaCalMonth=11;agendaCalYear--;} renderAgendaCal(); }
+function agendaCalNext(){ agendaCalMonth++; if(agendaCalMonth>11){agendaCalMonth=0;agendaCalYear++;} renderAgendaCal(); }
+function agendaCalToday(){ const now=new Date(); agendaCalYear=now.getFullYear(); agendaCalMonth=now.getMonth(); agendaSelectedDate=isoOffset(0); renderAgendaCal(); renderAgendaApptList(); }
+function agendaCalSelectDay(iso){ agendaSelectedDate=iso; renderAgendaCal(); renderAgendaApptList(); }
+function clearAgendaFilters(){ agendaCalToday(); }
+function renderAgendaCal(){
+  const label=document.getElementById('calMonthLabel'); if(label) label.textContent=`${monthNames[agendaCalMonth]} ${agendaCalYear}`;
+  const grid=document.getElementById('calGrid'); if(!grid) return;
+  const today=isoOffset(0);
+  const bookedDays=new Set(bookings.filter(b=>!selectedAgendaStaff||b.profId===selectedAgendaStaff).map(b=>String(b.date).slice(0,10)));
+  const firstDay=new Date(agendaCalYear,agendaCalMonth,1).getDay();
+  const daysInMonth=new Date(agendaCalYear,agendaCalMonth+1,0).getDate();
+  const daysInPrev=new Date(agendaCalYear,agendaCalMonth,0).getDate();
+  let html='';
+  for(let i=firstDay-1;i>=0;i--){ const d=daysInPrev-i; const m=agendaCalMonth===0?11:agendaCalMonth-1; const y=agendaCalMonth===0?agendaCalYear-1:agendaCalYear; const iso=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; html+=`<div class="cal-day other-month" onclick="agendaCalSelectDay('${iso}')">${d}</div>`; }
+  for(let d=1;d<=daysInMonth;d++){ const iso=`${agendaCalYear}-${String(agendaCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; const isToday=iso===today; const isSel=iso===agendaSelectedDate; const hasBk=bookedDays.has(iso); const dow=new Date(iso+'T00:00').getDay(); const cfg=businessConfig.hours[dow]; const closed=cfg&&cfg.closed; let cls='cal-day'; if(isSel) cls+=' selected'; else if(isToday) cls+=' today'; if(hasBk&&!isSel) cls+=' has-booking'; if(closed) cls+=' closed'; html+=`<div class="${cls}" onclick="agendaCalSelectDay('${iso}')">${d}</div>`; }
+  const total=firstDay+daysInMonth; const remaining=total%7===0?0:7-(total%7);
+  for(let d=1;d<=remaining;d++){ const m=agendaCalMonth===11?0:agendaCalMonth+1; const y=agendaCalMonth===11?agendaCalYear+1:agendaCalYear; const iso=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; html+=`<div class="cal-day other-month" onclick="agendaCalSelectDay('${iso}')">${d}</div>`; }
+  grid.innerHTML=html;
+  const dateLabel=document.getElementById('agendaDateLabel'); if(dateLabel&&agendaSelectedDate){ const ds=new Date(agendaSelectedDate+'T00:00'); dateLabel.textContent=`${weekdayFull[ds.getDay()]}, ${String(ds.getDate()).padStart(2,'0')} de ${monthNames[ds.getMonth()]}`; }
 }
-function clearAgendaFilters(){
-  document.getElementById('agendaDateFrom').value = '';
-  document.getElementById('agendaDateTo').value = '';
-  renderAgendaApptList();
-}
+
+
 function renderAgendaApptList(){
   const wrap = document.getElementById('agendaApptList');
-  if(!selectedAgendaStaff){
-    wrap.innerHTML = `<div class="empty-note">Selecione um colaborador para ver a agenda.</div>`;
-    return;
-  }
-  const dateFrom = document.getElementById('agendaDateFrom') ? document.getElementById('agendaDateFrom').value : '';
-  const dateTo   = document.getElementById('agendaDateTo')   ? document.getElementById('agendaDateTo').value   : '';
-  let list = bookings.filter(b => b.profId === selectedAgendaStaff);
-  if(dateFrom) list = list.filter(b => b.date >= dateFrom);
-  if(dateTo)   list = list.filter(b => b.date <= dateTo);
-  // Ordem crescente por data e hora
-  list.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
-  if(!list.length){
-    wrap.innerHTML = `<div class="empty-note">Sem agendamentos para este período.</div>`;
-    return;
-  }
+  if(!wrap) return;
+  renderAgendaCal();
+  if(!selectedAgendaStaff){ wrap.innerHTML = `<div class="empty-note">Selecione um colaborador acima.</div>`; return; }
+  let list = bookings.filter(b => b.profId === selectedAgendaStaff && String(b.date).slice(0,10) === agendaSelectedDate);
+  list.sort((a,b) => String(a.time).localeCompare(String(b.time)));
+  const dateLabel = document.getElementById('agendaDateLabel');
+  if(dateLabel && agendaSelectedDate){ const ds = new Date(agendaSelectedDate+'T00:00'); dateLabel.textContent = `${weekdayFull[ds.getDay()]}, ${String(ds.getDate()).padStart(2,'0')} de ${monthNames[ds.getMonth()]}`; }
+  if(!list.length){ wrap.innerHTML = `<div class="empty-note">Sem agendamentos neste dia.</div>`; return; }
   wrap.innerHTML = list.map(b => {
     const s = services.find(x => x.id === b.serviceId);
-    let dateStr = b.date;
-    if(!dateStr || String(dateStr).includes('T')){
-      try{ dateStr = new Date(dateStr).toISOString().slice(0,10); } catch(e){ dateStr = null; }
-    }
     let timeStr = toHHmm(b.time);
-    const d = dateStr ? new Date(dateStr + 'T00:00') : null;
+    const d = agendaSelectedDate ? new Date(agendaSelectedDate+'T00:00') : null;
     const dayLabel = d ? weekdayLabel[d.getDay()] : '—';
-    const dayNum   = d ? String(d.getDate()).padStart(2,'0') : '—';
-    const phone    = String(b.clientPhone || '').replace(/\D/g,'');
-    const waMsg    = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Monteiro Barbearia. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dayLabel}, dia ${dayNum}, as ${timeStr}. Aguardamos voce!`);
-    const waLink   = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
+    const dayNum = d ? String(d.getDate()).padStart(2,'0') : '—';
+    const phone = String(b.clientPhone || '').replace(/\D/g,'');
+    const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Monteiro Barbearia. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dayLabel}, dia ${dayNum}, as ${timeStr}. Aguardamos voce!`);
+    const waLink = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
     const payLabel = b.payment || '';
     const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '';
     return `
@@ -1655,7 +1712,7 @@ function renderAgendaApptList(){
           <div class="appt-info">
             <h3>${b.clientName || 'Cliente'}</h3>
             ${phoneFormatted ? `<a href="tel:+55${phone}" class="appt-phone">${phoneFormatted}</a>` : ''}
-            <p>${s ? s.name : 'Serviço'} · ${timeStr}</p>
+            <p>${s ? s.name : 'Servico'} · ${timeStr}</p>
             ${payLabel ? `<p style="color:var(--green-bright); font-size:.8rem; margin-top:2px;">💳 ${payLabel}</p>` : ''}
           </div>
         </div>
@@ -1663,16 +1720,11 @@ function renderAgendaApptList(){
           <div class="appt-status">Confirmado</div>
           <strong class="appt-value">R$ ${s ? s.price : 0}</strong>
           <div style="display:flex; gap:8px;">
-            ${waLink ? `<button class="icon-btn small" onclick="event.stopPropagation(); openWhatsApp('${waLink}')" title="Enviar lembrete via WhatsApp" style="color:#25D366;">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-            </button>` : ''}
-            <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})" title="Cancelar agendamento">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
-            </button>
+            ${waLink ? `<button class="icon-btn small" onclick="event.stopPropagation(); openWhatsApp('${waLink}')" title="Enviar lembrete" style="color:#25D366;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg></button>` : ''}
+            <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
           </div>
         </div>
-      </div>
-    `;
+      </div>`;
   }).join('');
 }
 
