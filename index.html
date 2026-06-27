@@ -668,6 +668,32 @@
         </div>
       </div>
 
+      <div class="admin-block"><h3>Janela de agendamento</h3></div>
+      <div class="admin-day">
+        <p style="font-size:.8rem; color:var(--muted); margin-bottom:12px;">Quantos dias à frente o cliente pode agendar.</p>
+        <div class="field" style="margin-bottom:0;">
+          <label>Antecedência máxima</label>
+          <select id="adminBookingWindow">
+            <option value="7">1 Semana (7 dias)</option>
+            <option value="15">15 Dias</option>
+            <option value="30" selected>1 Mês (30 dias)</option>
+            <option value="60">2 Meses</option>
+            <option value="90">3 Meses</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="admin-block"><h3>Bloquear agenda</h3></div>
+      <div class="admin-day">
+        <p style="font-size:.8rem; color:var(--muted); margin-bottom:12px;">Bloqueia um período para novos agendamentos (férias, feriados, etc).</p>
+        <div class="admin-times">
+          <div class="field"><label>De</label><input id="blockFrom" type="date"></div>
+          <div class="field"><label>Até</label><input id="blockTo" type="date"></div>
+        </div>
+        <button class="btn btn-ghost" style="margin-top:10px; width:100%;" onclick="addBlockedRange()">+ Adicionar bloqueio</button>
+        <div id="blockedRangesList" style="margin-top:10px;"></div>
+      </div>
+
       <div class="save-wrap">
         <button class="btn btn-gold" onclick="saveAdminConfig()">Salvar configurações</button>
       </div>
@@ -695,8 +721,14 @@
 
     <!-- TAB: AGENDAS -->
     <div class="admin-tab" id="adminTab-agenda" style="display:none;">
-      <div class="admin-block"><h3>Agenda por colaborador</h3></div>
+      <div class="admin-block" style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>Agenda por colaborador</h3>
+        <button class="mini-btn" onclick="openAdminBookingForm()" title="Novo agendamento">+</button>
+      </div>
       <div class="chip-row" id="agendaStaffChips"></div>
+
+      <!-- Formulário de novo agendamento pelo admin -->
+      <div id="adminBookingFormWrap" style="display:none; padding:0 22px; margin-bottom:14px;"></div>
 
       <!-- Calendário mensal -->
       <div class="cal-wrap">
@@ -880,6 +912,8 @@ let businessConfig = {
   interval: 30,
   breakStart: '12:00',
   breakEnd: '13:00',
+  bookingWindow: 30,
+  blockedRanges: [],
   hours: {
     0: {closed:true,  open:'08:00', close:'18:00'},
     1: {closed:true,  open:'08:00', close:'18:00'},
@@ -1149,23 +1183,30 @@ function generateSlots(dateIso, profId){
   return slots;
 }
 
+function isDateBlocked(iso){
+  const ranges = businessConfig.blockedRanges || [];
+  return ranges.some(r => iso >= r.from && iso <= r.to);
+}
+
 function renderDateStrip(){
   const wrap = document.getElementById('dateRow');
   let html = '';
   const now = new Date();
   const nowMin = now.getHours()*60 + now.getMinutes() + 30;
-  for(let i=0;i<10;i++){
+  const maxDays = Number(businessConfig.bookingWindow) || 30;
+  for(let i=0;i<maxDays;i++){
     const iso = isoOffset(i);
     const d = new Date(iso+'T00:00');
     const dow = d.getDay();
     const cfg = businessConfig.hours[dow];
     const closed = !cfg || cfg.closed;
+    const blocked = isDateBlocked(iso);
     let semSlot = false;
     if(!closed && i === 0){
       const [ch,cm] = toHHmm(cfg.close).split(':').map(Number);
       semSlot = nowMin >= ch*60+cm;
     }
-    const disable = closed || semSlot;
+    const disable = closed || semSlot || blocked;
     html += `<div class="date-chip ${iso===state.selectedDate?'active':''} ${disable?'closed':''}"
                   onclick="${disable?'':`selectDate('${iso}')`}">
                 <span>${weekdayLabel[dow]}</span><strong>${String(d.getDate()).padStart(2,'0')}</strong>
@@ -1179,10 +1220,10 @@ function renderDateStrip(){
     if(cfg0 && !cfg0.closed){
       const [ch,cm] = toHHmm(cfg0.close).split(':').map(Number);
       if(nowMin >= ch*60+cm){
-        for(let i=1;i<10;i++){
+        for(let i=1;i<maxDays;i++){
           const iso = isoOffset(i);
           const dow = new Date(iso+'T00:00').getDay();
-          if(businessConfig.hours[dow] && !businessConfig.hours[dow].closed){
+          if(businessConfig.hours[dow] && !businessConfig.hours[dow].closed && !isDateBlocked(iso)){
             state.selectedDate = iso;
             break;
           }
@@ -1332,6 +1373,9 @@ function renderAdminDays(){
   document.getElementById('adminInterval').value = businessConfig.interval;
   document.getElementById('breakStart').value = businessConfig.breakStart;
   document.getElementById('breakEnd').value = businessConfig.breakEnd;
+  if(document.getElementById('adminBookingWindow'))
+    document.getElementById('adminBookingWindow').value = businessConfig.bookingWindow || 30;
+  renderBlockedRanges();
 }
 function toggleDay(dow, isOpen){
   businessConfig.hours[dow].closed = !isOpen;
@@ -1346,11 +1390,12 @@ async function saveAdminConfig(){
   businessConfig.interval = Number(document.getElementById('adminInterval').value);
   businessConfig.breakStart = document.getElementById('breakStart').value;
   businessConfig.breakEnd = document.getElementById('breakEnd').value;
+  businessConfig.bookingWindow = Number(document.getElementById('adminBookingWindow').value);
   toast('Salvando...');
   const res = await apiPost('saveConfig', businessConfig);
   if(res.error){ toast(res.error); return; }
   renderHeroHours();
-  toast('Configurações salvas! Os horários dos clientes já refletem a alteração.');
+  toast('Configurações salvas!');
 }
 
 /* ===================== ADMIN TABS ===================== */
@@ -1726,6 +1771,143 @@ function renderAgendaApptList(){
         </div>
       </div>`;
   }).join('');
+}
+
+
+/* ===================== BLOQUEIO DE AGENDA ===================== */
+function renderBlockedRanges(){
+  const wrap = document.getElementById('blockedRangesList');
+  if(!wrap) return;
+  const ranges = businessConfig.blockedRanges || [];
+  if(!ranges.length){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = ranges.map((r,i) => `
+    <div style="display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid rgba(196,60,45,.2); border-radius:8px; padding:10px 14px; margin-top:8px;">
+      <span style="font-size:.85rem; color:var(--cream);">${r.from} → ${r.to}</span>
+      <button class="icon-btn small danger" onclick="removeBlockedRange(${i})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+function addBlockedRange(){
+  const from = document.getElementById('blockFrom').value;
+  const to   = document.getElementById('blockTo').value;
+  if(!from || !to){ toast('Selecione as datas de início e fim'); return; }
+  if(from > to){ toast('A data de início deve ser antes do fim'); return; }
+  // Limite: máximo 1 ano à frente
+  const maxDate = isoOffset(365);
+  if(to > maxDate){ toast('O bloqueio não pode ultrapassar 1 ano'); return; }
+  if(!businessConfig.blockedRanges) businessConfig.blockedRanges = [];
+  businessConfig.blockedRanges.push({from, to});
+  document.getElementById('blockFrom').value = '';
+  document.getElementById('blockTo').value = '';
+  renderBlockedRanges();
+  toast('Bloqueio adicionado — clique em Salvar para confirmar');
+}
+function removeBlockedRange(i){
+  businessConfig.blockedRanges.splice(i, 1);
+  renderBlockedRanges();
+  toast('Bloqueio removido — clique em Salvar para confirmar');
+}
+
+/* ===================== AGENDAMENTO PELO ADMIN ===================== */
+function openAdminBookingForm(){
+  const wrap = document.getElementById('adminBookingFormWrap');
+  wrap.style.display = 'block';
+  const today = isoOffset(0);
+  wrap.innerHTML = `
+    <div class="admin-inline-form" style="margin:0;">
+      <h3 style="font-size:.92rem; margin-bottom:14px;">Novo agendamento</h3>
+      <div class="field"><label>Nome do cliente</label><input id="abfName" type="text" placeholder="Nome completo"></div>
+      <div class="field"><label>Telefone (opcional)</label><input id="abfPhone" type="tel" placeholder="(11) 99999-9999"></div>
+      <div class="field">
+        <label>Colaborador</label>
+        <select id="abfProf" onchange="renderAdminBookingSlots()">
+          ${professionals.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Data</label><input id="abfDate" type="date" value="${today}" onchange="renderAdminBookingSlots()"></div>
+      <div class="field"><label>Serviço</label>
+        <select id="abfService">
+          ${services.map(s => `<option value="${s.id}">${s.name} — R$ ${s.price}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Horário disponível</label>
+        <div id="abfSlots" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:6px;"></div>
+      </div>
+      <div class="field"><label>Pagamento</label>
+        <select id="abfPayment">
+          <option value="Pix">Pix</option>
+          <option value="Crédito">Cartão Crédito</option>
+          <option value="Débito">Cartão Débito</option>
+          <option value="Dinheiro">Dinheiro</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button class="btn btn-green" style="flex:1;" onclick="saveAdminBooking()">Gravar agendamento</button>
+        <button class="btn btn-ghost" style="flex:1;" onclick="closeAdminBookingForm()">Cancelar</button>
+      </div>
+    </div>
+  `;
+  renderAdminBookingSlots();
+  wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+let adminSelectedSlot = null;
+function renderAdminBookingSlots(){
+  const profId = Number(document.getElementById('abfProf').value);
+  const date   = document.getElementById('abfDate').value;
+  const wrap   = document.getElementById('abfSlots');
+  if(!wrap) return;
+  adminSelectedSlot = null;
+  const slots = generateSlots(date, profId);
+  if(!slots.length){ wrap.innerHTML = `<div style="color:var(--muted); font-size:.8rem; grid-column:1/-1;">Nenhum slot disponível neste dia.</div>`; return; }
+  wrap.innerHTML = slots.map(s => `
+    <div class="slot ${s.available?'':'taken'}" id="abf-slot-${s.time.replace(':','-')}"
+         onclick="${s.available?`selectAdminSlot('${s.time}')`:''}">
+      ${s.time}
+    </div>
+  `).join('');
+}
+function selectAdminSlot(time){
+  adminSelectedSlot = time;
+  document.querySelectorAll('#abfSlots .slot').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById('abf-slot-'+time.replace(':','-'));
+  if(el) el.classList.add('selected');
+}
+function closeAdminBookingForm(){
+  const wrap = document.getElementById('adminBookingFormWrap');
+  wrap.style.display = 'none';
+  wrap.innerHTML = '';
+  adminSelectedSlot = null;
+}
+async function saveAdminBooking(){
+  const name    = document.getElementById('abfName').value.trim();
+  const phone   = document.getElementById('abfPhone').value.replace(/\D/g,'');
+  const profId  = Number(document.getElementById('abfProf').value);
+  const date    = document.getElementById('abfDate').value;
+  const serviceId = Number(document.getElementById('abfService').value);
+  const payment = document.getElementById('abfPayment').value;
+  if(!name){ toast('Digite o nome do cliente'); return; }
+  if(!date){ toast('Selecione a data'); return; }
+  if(!adminSelectedSlot){ toast('Selecione um horário'); return; }
+  const s = services.find(x => x.id === serviceId);
+  toast('Gravando...');
+  const res = await apiPost('addBooking', {
+    serviceId, profId, date, time: adminSelectedSlot,
+    clientName: name, clientPhone: phone, payment
+  });
+  if(res.error){ toast(res.error); return; }
+  bookings.push({ id: res.id, serviceId, profId, date, time: adminSelectedSlot, clientName: name, clientPhone: phone, payment });
+  closeAdminBookingForm();
+  // Navega o calendário pra data do agendamento
+  const d = new Date(date+'T00:00');
+  agendaCalYear  = d.getFullYear();
+  agendaCalMonth = d.getMonth();
+  agendaSelectedDate = date;
+  selectedAgendaStaff = profId;
+  renderAgendaStaffChips();
+  renderAgendaApptList();
+  toast(`Agendamento de ${name} gravado com sucesso!`);
 }
 
 /* ===================== ADMIN · CAIXA ===================== */
