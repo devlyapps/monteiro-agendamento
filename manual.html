@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual de Uso · Monteiro Barbearia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Jost:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0a;
+    --surface:#161616;
+    --surface-2:#1e1e1e;
+    --red:#c43c2d;
+    --red-bright:#e2543a;
+    --red-dim:rgba(196,60,45,.22);
+    --cream:#f2efe7;
+    --muted:#9a958c;
+    --muted-2:#6e6a62;
+    --green:#3fae66;
+    --green-bright:#6fe3a0;
+    --green-dim:rgba(63,174,102,.18);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--bg);
+    font-family:'Jost',sans-serif;
+    color:var(--cream);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.7;
+  }
+  h1,h2,h3,.serif{font-family:'Playfair Display',serif;}
+
+  /* ---- HERO ---- */
+  .hero{
+    min-height:340px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:60px 24px 48px;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(196,60,45,.18), transparent 70%),
+      repeating-linear-gradient(135deg,rgba(196,60,45,.05) 0 1px,transparent 1px 22px);
+    border-bottom:1px solid var(--red-dim);
+    position:relative;overflow:hidden;
+  }
+  .hero-tag{
+    font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--red-bright);margin-bottom:16px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .hero-tag::before,.hero-tag::after{content:'';flex:1;height:1px;background:var(--red-dim);max-width:48px;}
+  .hero h1{font-size:clamp(2rem,5vw,3rem);font-weight:700;line-height:1.15;margin-bottom:14px;}
+  .hero h1 em{color:var(--red-bright);font-style:normal;}
+  .hero p{font-size:1rem;color:var(--muted);max-width:480px;margin:0 auto 32px;}
+  .hero-pills{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  .pill{
+    padding:7px 16px;border-radius:999px;font-size:.78rem;font-weight:600;
+    border:1px solid var(--red-dim);color:var(--muted);cursor:pointer;
+    text-decoration:none;transition:all .2s;
+  }
+  .pill:hover,.pill.active{background:var(--red-bright);color:#1a1208;border-color:var(--red-bright);}
+  .pill.green{border-color:rgba(63,174,102,.4);color:var(--green-bright);}
+  .pill.green:hover{background:var(--green-bright);color:#0d2414;border-color:var(--green-bright);}
+
+  /* ---- LAYOUT ---- */
+  .wrapper{max-width:860px;margin:0 auto;padding:0 24px;}
+
+  /* ---- SEÇÃO DE PÚBLICO ---- */
+  .audience-tabs{
+    display:flex;gap:0;border-bottom:1px solid var(--red-dim);
+    position:sticky;top:0;z-index:20;background:var(--bg);
+  }
+  .aud-tab{
+    flex:1;padding:16px;text-align:center;font-size:.82rem;font-weight:600;
+    letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+    border-bottom:2px solid transparent;color:var(--muted);transition:all .2s;
+  }
+  .aud-tab.active{color:var(--red-bright);border-bottom-color:var(--red-bright);}
+
+  /* ---- SEÇÕES ---- */
+  .section{padding:56px 0 16px;}
+  .section-eyebrow{
+    font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--red-bright);margin-bottom:10px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .section-eyebrow::after{content:'';flex:1;height:1px;background:var(--red-dim);}
+  .section h2{font-size:1.6rem;font-weight:700;margin-bottom:8px;}
+  .section-desc{color:var(--muted);font-size:.9rem;margin-bottom:36px;max-width:560px;}
+
+  /* ---- CARDS DE FUNCIONALIDADE ---- */
+  .feature-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:16px;}
+  .feature-card{
+    background:var(--surface);border:1px solid rgba(196,60,45,.12);
+    border-radius:var(--radius);padding:22px 20px;
+    transition:border-color .2s;
+  }
+  .feature-card:hover{border-color:var(--red-dim);}
+  .feature-icon{
+    width:40px;height:40px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:1.2rem;margin-bottom:14px;
+  }
+  .icon-red{background:rgba(196,60,45,.15);}
+  .icon-green{background:rgba(63,174,102,.12);}
+  .icon-gold{background:rgba(196,150,45,.12);}
+  .feature-card h3{font-size:.95rem;font-weight:600;margin-bottom:6px;color:var(--cream);}
+  .feature-card p{font-size:.8rem;color:var(--muted);line-height:1.6;}
+
+  /* ---- STEPS ---- */
+  .steps{display:flex;flex-direction:column;gap:0;margin-bottom:8px;}
+  .step{
+    display:flex;gap:18px;align-items:flex-start;
+    padding:20px 0;border-bottom:1px solid rgba(196,60,45,.08);
+  }
+  .step:last-child{border-bottom:none;}
+  .step-num{
+    width:32px;height:32px;border-radius:50%;flex:none;
+    background:var(--red-dim);border:1px solid var(--red-bright);
+    display:flex;align-items:center;justify-content:center;
+    font-size:.78rem;font-weight:700;color:var(--red-bright);
+    font-family:'JetBrains Mono',monospace;margin-top:2px;
+  }
+  .step-body h4{font-size:.92rem;font-weight:600;margin-bottom:4px;color:var(--cream);}
+  .step-body p{font-size:.82rem;color:var(--muted);line-height:1.6;}
+
+  /* ---- TABS INFO ---- */
+  .tab-list{display:flex;flex-direction:column;gap:12px;margin-bottom:8px;}
+  .tab-item{
+    background:var(--surface);border:1px solid rgba(196,60,45,.1);
+    border-radius:var(--radius);overflow:hidden;
+  }
+  .tab-item-header{
+    display:flex;align-items:center;gap:14px;
+    padding:16px 20px;cursor:pointer;
+    transition:background .15s;
+  }
+  .tab-item-header:hover{background:var(--surface-2);}
+  .tab-badge{
+    padding:4px 10px;border-radius:999px;font-size:.68rem;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;flex:none;
+  }
+  .badge-red{background:rgba(196,60,45,.15);color:var(--red-bright);border:1px solid rgba(196,60,45,.3);}
+  .badge-green{background:rgba(63,174,102,.12);color:var(--green-bright);border:1px solid rgba(63,174,102,.25);}
+  .badge-gold{background:rgba(196,150,45,.12);color:#d4a843;border:1px solid rgba(196,150,45,.3);}
+  .tab-item-header h3{font-size:.95rem;font-weight:600;flex:1;}
+  .tab-item-header span.desc{font-size:.78rem;color:var(--muted);}
+  .tab-item-body{
+    padding:0 20px 20px;font-size:.82rem;color:var(--muted);
+    border-top:1px solid rgba(196,60,45,.08);
+    display:none;line-height:1.7;
+  }
+  .tab-item.open .tab-item-body{display:block;padding-top:16px;}
+  .tab-item.open .tab-item-header{background:var(--surface-2);}
+  .chevron{transition:transform .2s;color:var(--muted-2);}
+  .tab-item.open .chevron{transform:rotate(180deg);}
+
+  .tip{
+    background:rgba(63,174,102,.07);border:1px solid rgba(63,174,102,.2);
+    border-radius:10px;padding:12px 16px;margin-top:12px;
+    font-size:.8rem;color:var(--green-bright);display:flex;gap:8px;align-items:flex-start;
+  }
+  .tip::before{content:'💡';flex:none;}
+  .warn{
+    background:rgba(196,60,45,.07);border:1px solid rgba(196,60,45,.2);
+    border-radius:10px;padding:12px 16px;margin-top:12px;
+    font-size:.8rem;color:var(--red-bright);display:flex;gap:8px;align-items:flex-start;
+  }
+  .warn::before{content:'⚠️';flex:none;}
+
+  /* ---- FAQ ---- */
+  .faq-list{display:flex;flex-direction:column;gap:1px;border:1px solid rgba(196,60,45,.12);border-radius:var(--radius);overflow:hidden;}
+  .faq-item{}
+  .faq-q{
+    padding:16px 20px;font-size:.88rem;font-weight:600;
+    background:var(--surface);cursor:pointer;display:flex;justify-content:space-between;gap:12px;
+    transition:background .15s;
+  }
+  .faq-q:hover{background:var(--surface-2);}
+  .faq-a{
+    display:none;padding:0 20px 16px;font-size:.82rem;color:var(--muted);
+    background:var(--surface);line-height:1.65;border-top:1px solid rgba(196,60,45,.08);
+  }
+  .faq-item.open .faq-a{display:block;padding-top:14px;}
+  .faq-item.open .faq-q{background:var(--surface-2);}
+
+  /* ---- DIVIDER ---- */
+  .divider{
+    display:flex;align-items:center;gap:14px;
+    padding:40px 0 0;font-size:.68rem;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--red);
+  }
+  .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--red-dim);}
+
+  /* ---- AUDIENCE SECTIONS ---- */
+  .aud-section{display:none;}
+  .aud-section.active{display:block;}
+
+  /* ---- FOOTER ---- */
+  footer{
+    border-top:1px solid var(--red-dim);padding:32px 24px;
+    text-align:center;font-size:.75rem;color:var(--muted-2);margin-top:60px;
+  }
+  footer strong{color:var(--muted);}
+
+  /* ---- RESPONSIVE ---- */
+  @media(max-width:600px){
+    .feature-grid{grid-template-columns:1fr;}
+    .hero h1{font-size:1.8rem;}
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-tag">Monteiro Barbearia</div>
+  <h1>Manual de <em>Uso</em> do App</h1>
+  <p>Tudo que você precisa saber para aproveitar ao máximo o sistema de agendamento online.</p>
+  <div class="hero-pills">
+    <a class="pill active" href="#" onclick="showAud('cliente',this)">Sou cliente</a>
+    <a class="pill green" href="#" onclick="showAud('admin',this)">Sou administrador</a>
+  </div>
+</div>
+
+<div class="wrapper">
+
+  <!-- ===================== SEÇÃO CLIENTE ===================== -->
+  <div class="aud-section active" id="aud-cliente">
+
+    <!-- Visão geral -->
+    <div class="section">
+      <div class="section-eyebrow">Para clientes</div>
+      <h2 class="serif">O que você pode fazer no app</h2>
+      <p class="section-desc">O app permite agendar, acompanhar e gerenciar seus horários na barbearia direto do celular, sem precisar ligar.</p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon icon-red">📅</div>
+          <h3>Agendamento online</h3>
+          <p>Escolha o serviço, o profissional, a data e o horário disponível sem sair de casa.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon icon-green">🏆</div>
+          <h3>Cartão fidelidade</h3>
+          <p>Acumule selos a cada visita validada. Na 5ª visita: 10% OFF. Na 10ª: serviço grátis.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon icon-gold">🔔</div>
+          <h3>Lembretes automáticos</h3>
+          <p>Ative notificações e receba um lembrete antes do seu horário para não esquecer.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon icon-red">📋</div>
+          <h3>Histórico de horários</h3>
+          <p>Veja todos os seus agendamentos passados e próximos em um só lugar.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Como usar -->
+    <div class="divider">Passo a passo</div>
+    <div class="section">
+      <div class="section-eyebrow">Primeiros passos</div>
+      <h2 class="serif">Como criar sua conta e agendar</h2>
+      <p class="section-desc">Leva menos de 2 minutos para criar sua conta e fazer seu primeiro agendamento.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <div class="step-body">
+            <h4>Crie sua conta</h4>
+            <p>Na tela inicial, toque em <strong>Criar conta</strong>. Preencha seu nome, celular com DDD e uma senha de pelo menos 4 caracteres. Guarde bem sua senha — ela é necessária para entrar depois.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <div class="step-body">
+            <h4>Escolha o serviço</h4>
+            <p>Na tela inicial você verá todos os serviços disponíveis. Use os filtros por categoria (Cabelo, Barba, etc.) ou a barra de busca para encontrar o que deseja. Toque no botão <strong>+</strong> ao lado do serviço para iniciar o agendamento.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <div class="step-body">
+            <h4>Escolha o profissional</h4>
+            <p>Selecione com qual profissional deseja ser atendido. Apenas os profissionais que realizam o serviço escolhido aparecerão disponíveis.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">04</div>
+          <div class="step-body">
+            <h4>Escolha a data e horário</h4>
+            <p>Use o calendário para navegar pelos dias. Toque em um dia para ver os horários disponíveis. Horários riscados já estão ocupados. Selecione o horário que preferir.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">05</div>
+          <div class="step-body">
+            <h4>Confirme o agendamento</h4>
+            <p>Escolha a forma de pagamento preferida (Pix, Crédito, Débito ou Dinheiro) e toque em <strong>Agendar</strong>. Uma tela de confirmação aparecerá com todos os detalhes do seu horário.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Abas explicadas -->
+    <div class="divider">As telas do app</div>
+    <div class="section">
+      <div class="section-eyebrow">Navegação</div>
+      <h2 class="serif">O que significa cada ícone</h2>
+      <p class="section-desc">O app possui 3 telas principais acessíveis pelo menu inferior.</p>
+      <div class="tab-list">
+
+        <div class="tab-item open">
+          <div class="tab-item-header" onclick="toggleTab(this)">
+            <div class="tab-badge badge-red">🏠 Início</div>
+            <h3>Tela principal com os serviços</h3>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="tab-item-body">
+            É a primeira tela que aparece após fazer login. Aqui você encontra:
+            <ul style="margin:10px 0 0 16px;display:flex;flex-direction:column;gap:6px;">
+              <li>Lista de todos os serviços disponíveis com preços</li>
+              <li>Filtros por categoria (Cabelo, Barba, Unhas, Estética)</li>
+              <li>Barra de busca para encontrar serviços pelo nome</li>
+              <li>Banner para ativar lembretes de agendamento</li>
+            </ul>
+            <div class="tip">Toque no botão <strong>+</strong> ao lado de qualquer serviço para iniciar o agendamento.</div>
+          </div>
+        </div>
+
+        <div class="tab-item">
+          <div class="tab-item-header" onclick="toggleTab(this)">
+            <div class="tab-badge badge-red">🕐 Horários</div>
+            <h3>Seus agendamentos</h3>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="tab-item-body">
+            Lista todos os seus próximos agendamentos confirmados com data, horário, serviço e profissional. Você também pode cancelar um agendamento por aqui caso precise remarcar.
+            <div class="warn">Cancele com antecedência para liberar o horário para outros clientes.</div>
+          </div>
+        </div>
+
+        <div class="tab-item">
+          <div class="tab-item-header" onclick="toggleTab(this)">
+            <div class="tab-badge badge-green">👤 Perfil</div>
+            <h3>Cartão fidelidade e histórico</h3>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="tab-item-body">
+            Aqui fica o seu cartão fidelidade digital com:
+            <ul style="margin:10px 0 0 16px;display:flex;flex-direction:column;gap:6px;">
+              <li>Contador de visitas validadas (de 0 a 10)</li>
+              <li>Barra de progresso visual</li>
+              <li>Indicação de quantas visitas faltam para a próxima recompensa</li>
+              <li>Histórico completo de visitas validadas</li>
+            </ul>
+            <div class="tip">Os selos só são adicionados quando a barbearia <strong>valida</strong> sua visita após o atendimento. Lembre de pedir ao profissional!</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FAQ cliente -->
+    <div class="divider">Dúvidas frequentes</div>
+    <div class="section">
+      <div class="section-eyebrow">FAQ · Clientes</div>
+      <h2 class="serif">Perguntas mais comuns</h2>
+      <p class="section-desc"></p>
+      <div class="faq-list">
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Esqueci minha senha. O que faço? <span>▾</span></div>
+          <div class="faq-a">Entre em contato com a barbearia pelo WhatsApp. O administrador pode redefinir o seu acesso.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Posso agendar para outra pessoa? <span>▾</span></div>
+          <div class="faq-a">Sim. Basta fazer o agendamento normalmente. No momento da confirmação, informe ao profissional que o horário é para outra pessoa.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Meu horário não foi exibido. Por quê? <span>▾</span></div>
+          <div class="faq-a">Horários passados ou já ocupados são ocultados automaticamente. Se todos os horários de um dia estiverem indisponíveis, tente outra data ou outro profissional.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">O cartão fidelidade é vinculado ao meu celular? <span>▾</span></div>
+          <div class="faq-a">Sim. O cartão fidelidade está vinculado ao número de celular cadastrado. Não compartilhe sua conta com outras pessoas para não misturar os pontos.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Como ativo os lembretes de agendamento? <span>▾</span></div>
+          <div class="faq-a">Toque no banner "Ativar lembretes" que aparece na tela Início ou na tela Horários. Você precisará permitir as notificações quando o navegador solicitar. Funciona melhor com o app instalado na tela inicial do celular.</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /aud-cliente -->
+
+
+  <!-- ===================== SEÇÃO ADMIN ===================== -->
+  <div class="aud-section" id="aud-admin">
+
+    <!-- Visão geral -->
+    <div class="section">
+      <div class="section-eyebrow">Para administradores</div>
+      <h2 class="serif">O que você gerencia pelo painel</h2>
+      <p class="section-desc">O painel administrativo centraliza tudo: agendamentos, equipe, serviços, caixa e clientes em um só lugar.</p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon icon-gold">💰</div>
+          <h3>Caixa</h3>
+          <p>Visualize todos os atendimentos do dia com filtro por data e colaborador, e veja o total faturado.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon icon-red">📆</div>
+          <h3>Agendas</h3>
+          <p>Veja e crie agendamentos diretamente no calendário, por colaborador, com visão dos horários livres e ocupados.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon icon-red">⚙️</div>
+          <h3>Funcionamento</h3>
+          <p>Configure os dias e horários de funcionamento, intervalo de atendimento, pausa e bloqueios de agenda.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon icon-green">👥</div>
+          <h3>Colaboradores</h3>
+          <p>Cadastre, edite e remova profissionais da equipe, definindo quais serviços cada um realiza.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon icon-red">✂️</div>
+          <h3>Serviços</h3>
+          <p>Gerencie o catálogo de serviços com nome, categoria, duração, preço e foto.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon icon-green">👤</div>
+          <h3>Clientes</h3>
+          <p>Consulte clientes cadastrados, veja o tempo desde a última visita e envie mensagens pelo WhatsApp.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Como acessar -->
+    <div class="divider">Acesso ao painel</div>
+    <div class="section">
+      <div class="section-eyebrow">Login administrativo</div>
+      <h2 class="serif">Como entrar no painel</h2>
+      <p class="section-desc"></p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <div class="step-body">
+            <h4>Acesse a tela de login</h4>
+            <p>Na tela inicial do app, role até o final e toque no link discreto <strong>"Acesso administrativo"</strong> abaixo dos botões de login.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <div class="step-body">
+            <h4>Digite as credenciais</h4>
+            <p>Informe o usuário e a senha do administrador. Estas credenciais são diferentes das contas de clientes e ficam fixas no sistema.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <div class="step-body">
+            <h4>Navegue pelas abas</h4>
+            <p>Após entrar, você verá as abas no topo da tela: <strong>Caixa, Agendas, Funcionamento, Colaboradores, Serviços</strong> e <strong>Clientes</strong>. Toque em qualquer aba para acessar aquela seção.</p>
+          </div>
+        </div>
+      </div>
+      <div class="tip">O sistema lembra sua sessão. Você não precisa fazer login toda vez que abre o app.</div>
+    </div>
+
+    <!-- Abas do painel -->
+    <div class="divider">As abas do painel</div>
+    <div class="section">
+      <div class="section-eyebrow">Detalhes de cada aba</div>
+      <h2 class="serif">O que fazer em cada seção</h2>
+      <p class="section-desc">Clique em cada aba para ver como funciona e o que pode ser feito.</p>
+      <div class="tab-list">
+
+        <div class="tab-item open">
+          <div class="tab-item-header" onclick="toggleTab(this)">
+            <div class="tab-badge badge-gold">💰 Caixa</div>
+            <h3>Serviços do dia e faturamento</h3>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="tab-item-body">
+            A aba Caixa é o painel financeiro do dia. Ela mostra:
+            <ul style="margin:10px 0 8px 16px;display:flex;flex-direction:column;gap:6px;">
+              <li>Um calendário para selecionar a data</li>
+              <li>Filtro por colaborador</li>
+              <li>Lista de todos os atendimentos do período selecionado com cliente, serviço, horário e forma de pagamento</li>
+              <li>Total faturado no período filtrado</li>
+              <li>Botão de WhatsApp para enviar lembrete ao cliente</li>
+              <li>Botão para cancelar um atendimento</li>
+            </ul>
+            <div class="tip">Use o filtro de colaborador para ver o faturamento individual de cada profissional.</div>
+          </div>
+        </div>
+
+        <div class="tab-item">
+          <div class="tab-item-header" onclick="toggleTab(this)">
+            <div class="tab-badge badge-red">📆 Agendas</div>
+            <h3>Calendário e agendamento pelo admin</h3>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="tab-item-body">
+            A aba Agendas é o coração da gestão de horários. Aqui você pode:
+            <ul style="margin:10px 0 8px 16px;display:flex;flex-direction:column;gap:6px;">
+              <li>Selecionar um colaborador pelos chips no topo</li>
+              <li>Navegar pelo calendário mensal (dias com agendamentos aparecem marcados)</li>
+              <li><strong>Clicar em qualquer data</strong> para ver todos os horários daquele dia</li>
+              <li>Ver quem está agendado em cada horário ocupado</li>
+              <li>Criar um novo agendamento clicando em um horário livre</li>
+              <li>Validar visitas para o cartão fidelidade do cliente</li>
+              <li>Enviar lembrete via WhatsApp</li>
+              <li>Cancelar agendamentos</li>
+            </ul>
+            <div class="tip">Ao clicar em uma data, um painel desliza de baixo com todos os horários do colaborador selecionado — ocupados e livres.</div>
+          </div>
+        </div>
+
+        <div class="tab-item">
+          <div class="tab-item-header" onclick="toggleTab(this)">
+            <div class="tab-badge badge-red">⚙️ Funcionamento</div>
+            <h3>Horários, intervalos e bloqueios</h3>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="tab-item-body">
+            Configure como a barbearia funciona. Tudo que você define aqui impacta diretamente quais horários aparecem para os clientes.
+            <ul style="margin:10px 0 8px 16px;display:flex;flex-direction:column;gap:6px;">
+              <li><strong>Dias e horários:</strong> ative ou desative cada dia da semana e defina a abertura e o fechamento</li>
+              <li><strong>Duração do slot:</strong> intervalo entre cada horário disponível (ex: 30 minutos)</li>
+              <li><strong>Pausa/almoço:</strong> período em que nenhum horário é gerado</li>
+              <li><strong>Janela de agendamento:</strong> quantos dias à frente o cliente pode agendar</li>
+              <li><strong>Bloqueio de agenda:</strong> bloqueia um período inteiro (férias, feriados)</li>
+            </ul>
+            <div class="warn">Sempre clique em <strong>Salvar configurações</strong> após fazer alterações. As mudanças não são salvas automaticamente.</div>
+          </div>
+        </div>
+
+        <div class="tab-item">
+          <div class="tab-item-header" onclick="toggleTab(this)">
+            <div class="tab-badge badge-green">👥 Colaboradores</div>
+            <h3>Cadastro e gestão da equipe</h3>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="tab-item-body">
+            Gerencie os profissionais da equipe. Para cada colaborador você define:
+            <ul style="margin:10px 0 8px 16px;display:flex;flex-direction:column;gap:6px;">
+              <li>Nome completo e função (ex: Barbeiro, Manicure)</li>
+              <li>Quais serviços ele realiza (vinculado ao catálogo de serviços)</li>
+            </ul>
+            Toque no botão <strong>+</strong> no canto superior direito para cadastrar um novo colaborador. Toque no ícone de lápis para editar ou na lixeira para remover.
+            <div class="tip">Um colaborador só aparece nas opções de agendamento do cliente se estiver cadastrado e vinculado ao serviço em questão.</div>
+          </div>
+        </div>
+
+        <div class="tab-item">
+          <div class="tab-item-header" onclick="toggleTab(this)">
+            <div class="tab-badge badge-red">✂️ Serviços</div>
+            <h3>Catálogo de serviços oferecidos</h3>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="tab-item-body">
+            Gerencie tudo que a barbearia oferece. Para cada serviço você cadastra:
+            <ul style="margin:10px 0 8px 16px;display:flex;flex-direction:column;gap:6px;">
+              <li>Nome do serviço</li>
+              <li>Categoria (Cabelo, Barba, Unhas, Estética)</li>
+              <li>Duração em minutos</li>
+              <li>Preço</li>
+              <li>Foto (opcional)</li>
+            </ul>
+            <div class="tip">Manter as fotos dos serviços atualizadas deixa o app mais atrativo para os clientes.</div>
+            <div class="warn">Ao remover um serviço, ele é desvinculado dos colaboradores automaticamente. Agendamentos existentes não são apagados.</div>
+          </div>
+        </div>
+
+        <div class="tab-item">
+          <div class="tab-item-header" onclick="toggleTab(this)">
+            <div class="tab-badge badge-green">👤 Clientes</div>
+            <h3>Base de clientes e retenção</h3>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="tab-item-body">
+            Veja todos os clientes cadastrados no app. Para cada cliente você vê:
+            <ul style="margin:10px 0 8px 16px;display:flex;flex-direction:column;gap:6px;">
+              <li>Nome e telefone</li>
+              <li>Dias desde a última visita (código de cores: verde até 15 dias, amarelo até 30, vermelho acima de 30)</li>
+              <li>Progresso no cartão fidelidade</li>
+              <li>Botão de WhatsApp com mensagem personalizada de retorno</li>
+            </ul>
+            Use a barra de busca no topo para filtrar por nome ou telefone.
+            <div class="tip">Clientes em vermelho (mais de 30 dias sem visita) são os mais importantes para acionar. Use o WhatsApp direto pelo app para reconquistá-los.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FAQ admin -->
+    <div class="divider">Dúvidas frequentes</div>
+    <div class="section">
+      <div class="section-eyebrow">FAQ · Administradores</div>
+      <h2 class="serif">Perguntas mais comuns</h2>
+      <p class="section-desc"></p>
+      <div class="faq-list">
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Como cancelo um agendamento de um cliente? <span>▾</span></div>
+          <div class="faq-a">Na aba <strong>Agendas</strong>, selecione o colaborador e a data. Clique na data para abrir o painel de horários. Na lista de agendamentos da tela principal, toque no ícone de lixeira ao lado do agendamento que deseja cancelar.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Como valido a visita de um cliente para o cartão fidelidade? <span>▾</span></div>
+          <div class="faq-a">Na aba <strong>Agendas</strong>, após o atendimento, toque no ícone de check (✓) verde ao lado do agendamento do cliente. Isso adiciona um selo ao cartão fidelidade dele. Cada visita só pode ser validada uma vez.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Posso bloquear a agenda em um feriado? <span>▾</span></div>
+          <div class="faq-a">Sim. Vá em <strong>Funcionamento → Bloquear agenda</strong>. Informe a data de início e fim do bloqueio e clique em <strong>+ Adicionar bloqueio</strong>. Depois clique em <strong>Salvar configurações</strong>. O período ficará indisponível para novos agendamentos.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">O cliente não está vendo horários disponíveis. O que fazer? <span>▾</span></div>
+          <div class="faq-a">Verifique em <strong>Funcionamento</strong> se o dia da semana está ativo e com horários configurados. Confirme também se não há um bloqueio de agenda cobrindo aquele período. Se o colaborador não estiver vinculado ao serviço escolhido, os horários não aparecem.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Como envio um lembrete de agendamento pelo WhatsApp? <span>▾</span></div>
+          <div class="faq-a">Tanto na aba <strong>Agendas</strong> quanto na aba <strong>Caixa</strong>, cada agendamento tem um botão verde com o ícone do WhatsApp. Toque nele para abrir uma conversa com o cliente com uma mensagem de lembrete já preenchida automaticamente.</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /aud-admin -->
+
+</div><!-- /wrapper -->
+
+<footer>
+  <strong>Monteiro Barbearia</strong> · Manual de Uso do App de Agendamento<br>
+  <span style="margin-top:4px;display:block;">Desenvolvido por felpsworks</span>
+</footer>
+
+<script>
+  function showAud(id, el){
+    event.preventDefault();
+    document.querySelectorAll('.aud-section').forEach(s => s.classList.remove('active'));
+    document.getElementById('aud-'+id).classList.add('active');
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  // Detecta hash na URL para abrir aba correta
+  (function(){
+    const hash = window.location.hash.replace('#','');
+    if(hash === 'admin'){
+      document.querySelectorAll('.aud-section').forEach(s => s.classList.remove('active'));
+      document.getElementById('aud-admin').classList.add('active');
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+      document.querySelector('.pill.green').classList.add('active');
+    }
+  })();
+
+  function toggleTab(header){
+    const item = header.closest('.tab-item');
+    item.classList.toggle('open');
+  }
+
+  function toggleFaq(qEl){
+    const item = qEl.closest('.faq-item');
+    const wasOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(f => f.classList.remove('open'));
+    if(!wasOpen) item.classList.add('open');
+  }
+</script>
+</body>
+</html>
