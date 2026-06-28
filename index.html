@@ -509,6 +509,43 @@
   .loyalty-modal-header span{font-size:.78rem; color:var(--muted);}
   .loyalty-modal-body{overflow-y:auto; padding:0 0 4px; flex:1;}
 
+  /* ---------- COMPARTILHAR LINK ---------- */
+  .share-bar{
+    padding:10px 22px; border-bottom:1px solid var(--red-dim);
+  }
+  .share-btn{
+    width:100%; padding:10px 16px; border-radius:var(--radius);
+    background:rgba(196,60,45,.1); border:1px solid var(--red-dim);
+    color:var(--cream); font-size:.82rem; font-weight:600;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    cursor:pointer; transition:background .15s;
+  }
+  .share-btn:hover{ background:rgba(196,60,45,.2); }
+  .share-modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.82); backdrop-filter:blur(5px);
+    display:none; align-items:flex-end; justify-content:center; z-index:80;
+  }
+  .share-modal-overlay.show{ display:flex; }
+  .share-modal-sheet{
+    width:100%; max-width:430px; background:var(--surface);
+    border-radius:22px 22px 0 0; border-top:1px solid var(--red-dim);
+    padding:0 0 40px; animation:slideUp .3s ease;
+  }
+  .share-modal-handle{ width:36px; height:4px; background:var(--muted-2); border-radius:2px; margin:12px auto 0; }
+  .share-modal-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px 12px; border-bottom:1px solid var(--red-dim);
+  }
+  .share-modal-header h3{ font-size:1rem; font-weight:600; font-family:'Playfair Display',serif; }
+  .share-modal-body{ padding:20px 22px 0; }
+  .share-link-box{
+    background:var(--surface-2); border:1px solid var(--red-dim); border-radius:10px;
+    padding:12px 14px; font-size:.78rem; color:var(--muted); word-break:break-all;
+    margin-bottom:16px;
+  }
+  .share-actions{ display:flex; gap:10px; }
+  .share-actions .btn{ flex:1; }
+
   /* ---------- CARD CLIENTE ---------- */
   .client-card{
     margin:0 22px 12px; padding:14px 16px; border-radius:var(--radius);
@@ -847,6 +884,31 @@
       <div class="chip" data-tab="staff" onclick="setAdminTab('staff')">Colaboradores</div>
       <div class="chip" data-tab="services" onclick="setAdminTab('services')">Serviços</div>
       <div class="chip" data-tab="clients" onclick="setAdminTab('clients')">Clientes</div>
+    </div>
+
+    <div class="share-bar">
+      <button class="share-btn" onclick="openShareModal()">🔗 Compartilhar link de agendamento</button>
+    </div>
+
+    <!-- MODAL COMPARTILHAR LINK -->
+    <div class="share-modal-overlay" id="shareModalOverlay" onclick="closeShareModal(event)">
+      <div class="share-modal-sheet">
+        <div class="share-modal-handle"></div>
+        <div class="share-modal-header">
+          <h3>Compartilhar link</h3>
+          <button class="icon-btn" onclick="closeShareModalDirect()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="share-modal-body">
+          <p style="font-size:.82rem; color:var(--muted); margin-bottom:12px;">Envie este link para seus clientes acessarem o agendamento online:</p>
+          <div class="share-link-box" id="shareLinkBox"></div>
+          <div class="share-actions">
+            <button class="btn btn-green" onclick="shareOnWhatsApp()">📲 WhatsApp</button>
+            <button class="btn btn-ghost" onclick="copyShareLink()">📋 Copiar link</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- TAB: FUNCIONAMENTO -->
@@ -1297,6 +1359,33 @@ function setNav(which){
   if(which==='appointments') document.getElementById('navAppt').classList.add('active');
   if(which==='profile') document.getElementById('navProfile').classList.add('active');
   if(which==='admin') document.getElementById('navAdmin').classList.add('active');
+}
+
+/* ===================== COMPARTILHAR LINK ===================== */
+function openShareModal(){
+  const link = window.location.origin + window.location.pathname;
+  document.getElementById('shareLinkBox').textContent = link;
+  document.getElementById('shareModalOverlay').classList.add('show');
+}
+function closeShareModalDirect(){
+  document.getElementById('shareModalOverlay').classList.remove('show');
+}
+function closeShareModal(e){
+  if(e.target === document.getElementById('shareModalOverlay')) closeShareModalDirect();
+}
+function shareOnWhatsApp(){
+  const link = document.getElementById('shareLinkBox').textContent;
+  const msg = encodeURIComponent(`Olá! Agora você pode agendar seu horário na Barbearia Monteiro de forma rápida e fácil pelo nosso app. Acesse aqui: ${link}`);
+  window.open(`https://wa.me/?text=${msg}`, '_blank');
+}
+function copyShareLink(){
+  const link = document.getElementById('shareLinkBox').textContent;
+  navigator.clipboard.writeText(link).then(() => {
+    toast('✅ Link copiado!');
+    closeShareModalDirect();
+  }).catch(() => {
+    toast('Erro ao copiar. Copie manualmente.');
+  });
 }
 
 /* ===================== CARTÃO FIDELIDADE ===================== */
@@ -2219,7 +2308,7 @@ function renderAgendaApptList(){
     const dayLabel = d ? weekdayLabel[d.getDay()] : '—';
     const dayNum = d ? String(d.getDate()).padStart(2,'0') : '—';
     const phone = String(b.clientPhone || '').replace(/\D/g,'');
-    const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Monteiro Barbearia. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dayLabel}, dia ${dayNum}, as ${timeStr}. Aguardamos voce!`);
+    const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Barbearia Monteiro. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dayLabel}, dia ${dayNum}, as ${timeStr}. Aguardamos voce!`);
     const waLink = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
     const payLabel = b.payment || '';
     const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '';
@@ -2662,7 +2751,7 @@ async function renderClientesTab(){
     const loyaltyNext = loyalty >= 10 ? '🎉 Grátis!' : loyalty >= 5 ? `${10-loyalty} p/ grátis` : `${5-loyalty} p/ 10% OFF`;
 
     // Mensagem WhatsApp personalizada
-    let waText = `Ola, ${c.name}! Tudo bem? Passando para lembrar que ja faz ${days} dias desde o seu ultimo atendimento. Saudades de voce aqui na Monteiro Barbearia!`;
+    let waText = `Ola, ${c.name}! Tudo bem? Passando para lembrar que ja faz ${days} dias desde o seu ultimo atendimento. Saudades de voce aqui na Barbearia Monteiro!`;
     if(loyalty >= 6 && loyalty < 11){
       waText += ` Voce esta a ${11-loyalty} visita${10-loyalty>1?'s':''} de ganhar um servico GRATIS!`;
     } else if(loyalty < 5){
@@ -2802,7 +2891,7 @@ function renderCaixaList(){
       const dateLabel = d ? `${weekdayLabel[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}` : '—';
       const payLabel = b.payment ? `💳 ${b.payment}` : '';
       const phone = String(b.clientPhone || '').replace(/\D/g,'');
-      const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Monteiro Barbearia. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dateLabel} as ${timeStr || '—'}. Aguardamos voce!`);
+      const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Barbearia Monteiro. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dateLabel} as ${timeStr || '—'}. Aguardamos voce!`);
       const waLink = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
       return `
         <div class="service-card">
