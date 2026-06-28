@@ -472,12 +472,38 @@
   .loyalty-history-info strong{font-size:.88rem; color:var(--cream); display:block;}
   .loyalty-history-info span{font-size:.75rem; color:var(--muted);}
 
+  /* ---------- MODAL FIDELIDADE CLIENTE (ADMIN VIEW) ---------- */
+  .loyalty-modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.85); backdrop-filter:blur(5px);
+    display:none; align-items:flex-end; justify-content:center; z-index:70; padding:0;
+  }
+  .loyalty-modal-overlay.show{display:flex;}
+  .loyalty-modal-sheet{
+    width:100%; max-width:430px; background:var(--surface);
+    border-radius:22px 22px 0 0; border-top:1px solid var(--red-dim);
+    padding:0 0 36px; animation:slideUp .3s ease;
+    max-height:90vh; display:flex; flex-direction:column;
+  }
+  .loyalty-modal-handle{
+    width:36px; height:4px; background:var(--muted-2); border-radius:2px;
+    margin:12px auto 0; flex:none;
+  }
+  .loyalty-modal-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px 12px; border-bottom:1px solid var(--red-dim); flex:none;
+  }
+  .loyalty-modal-header h3{font-size:1rem; font-weight:600; font-family:'Playfair Display',serif;}
+  .loyalty-modal-header span{font-size:.78rem; color:var(--muted);}
+  .loyalty-modal-body{overflow-y:auto; padding:0 0 4px; flex:1;}
+
   /* ---------- CARD CLIENTE ---------- */
   .client-card{
     margin:0 22px 12px; padding:14px 16px; border-radius:var(--radius);
     background:var(--surface); border-left:4px solid var(--red-dim);
     border-top:1px solid rgba(196,60,45,.1); border-right:1px solid rgba(196,60,45,.1); border-bottom:1px solid rgba(196,60,45,.1);
+    cursor:pointer; transition:border-color .15s;
   }
+  .client-card:hover{ border-left-color:var(--red-bright); }
   .client-card.green{ border-left-color:#3fae66; }
   .client-card.yellow{ border-left-color:#d4a017; }
   .client-card.red{ border-left-color:#e2543a; }
@@ -1026,6 +1052,23 @@
   </nav>
 
   <div class="toast" id="toast"></div>
+
+  <!-- ============ MODAL FIDELIDADE CLIENTE (ADMIN VIEW) ============ -->
+  <div class="loyalty-modal-overlay" id="loyaltyModalOverlay" onclick="closeLoyaltyModal(event)">
+    <div class="loyalty-modal-sheet">
+      <div class="loyalty-modal-handle"></div>
+      <div class="loyalty-modal-header">
+        <div>
+          <h3 id="loyaltyModalName">Cliente</h3>
+          <span id="loyaltyModalPhone"></span>
+        </div>
+        <button class="icon-btn" onclick="closeLoyaltyModalDirect()" style="flex:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="loyalty-modal-body" id="loyaltyModalBody"></div>
+    </div>
+  </div>
 
   <!-- ============ MODAL HORÁRIOS DO DIA (ADMIN) ============ -->
   <div class="day-slots-overlay" id="daySlotsOverlay" onclick="closeDaySlots(event)">
@@ -2491,6 +2534,123 @@ async function saveAdminBooking(){
   toast(`Agendamento de ${name} gravado com sucesso!`);
 }
 
+/* ===================== ADMIN · MODAL FIDELIDADE CLIENTE ===================== */
+async function openLoyaltyModal(name, phone, loyaltyCount){
+  document.getElementById('loyaltyModalName').textContent = name || 'Cliente';
+  const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '';
+  document.getElementById('loyaltyModalPhone').textContent = phoneFormatted;
+  document.getElementById('loyaltyModalBody').innerHTML = `<div style="padding:24px; text-align:center; color:var(--muted); font-size:.85rem;">Carregando fidelidade...</div>`;
+  document.getElementById('loyaltyModalOverlay').classList.add('show');
+
+  // Busca visitas do cliente
+  let visits = [];
+  let total = loyaltyCount || 0;
+  if(phone){
+    try{
+      const res = await apiPost('getLoyalty', { phone });
+      if(!res.error){
+        total = res.total || 0;
+        visits = res.visits || [];
+      }
+    } catch(e){}
+  }
+
+  renderLoyaltyModalBody(name, total, visits);
+}
+
+function renderLoyaltyModalBody(name, total, visits){
+  const TOTAL = 10;
+  const pct = Math.min((total / TOTAL) * 100, 100);
+
+  // Banner de status
+  let nextMsg = '';
+  if(total >= TOTAL){
+    nextMsg = `<div style="background:rgba(63,174,102,.12);border:1px solid rgba(63,174,102,.3);border-radius:8px;padding:8px 12px;text-align:center;font-size:.78rem;color:var(--green-bright);margin-bottom:18px;">🎉 ${name.split(' ')[0]} ganhou um serviço GRÁTIS!</div>`;
+  } else if(total >= 5){
+    const rem = TOTAL - total;
+    nextMsg = `<div style="background:rgba(196,60,45,.1);border:1px solid rgba(196,60,45,.2);border-radius:8px;padding:8px 12px;text-align:center;font-size:.78rem;color:var(--red-bright);margin-bottom:18px;">Faltam ${rem} visita${rem>1?'s':''} para o serviço GRÁTIS</div>`;
+  } else {
+    const rem5 = 5 - total;
+    nextMsg = `<div style="background:rgba(196,60,45,.1);border:1px solid rgba(196,60,45,.2);border-radius:8px;padding:8px 12px;text-align:center;font-size:.78rem;color:var(--red-bright);margin-bottom:18px;">Faltam ${rem5} visita${rem5>1?'s':''} para 10% OFF</div>`;
+  }
+
+  // Grade de selos com logo como carimbo
+  let sealsHtml = '';
+  for(let i = 1; i <= TOTAL; i++){
+    const filled = i <= total;
+    const is5  = i === 5;
+    const is10 = i === 10;
+    let cls = `loyalty-seal ${filled ? 'filled' : 'empty'}`;
+    if(is5)  cls += ' special-5';
+    if(is10) cls += ' special-10';
+
+    // Logo da barbearia como carimbo (ícone de tesoura estilizado)
+    const stamp = filled ? `
+      <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" style="width:60%;height:60%;opacity:.92;">
+        <circle cx="8" cy="8" r="4.5" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2"/>
+        <circle cx="8" cy="30" r="4.5" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2"/>
+        <line x1="12" y1="12" x2="34" y2="34" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="12" y1="28" x2="34" y2="8"  stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="8"  y1="12.5" x2="8" y2="25.5" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round"/>
+      </svg>` : '';
+
+    const badge = is5  ? `<span class="discount-badge">10% OFF</span>` :
+                  is10 ? `<span class="discount-badge">GRÁTIS</span>` : '';
+    sealsHtml += `<div class="${cls}">${stamp}<span class="seal-num">${i}</span>${badge}</div>`;
+  }
+
+  // Histórico
+  let histHtml = '';
+  if(visits.length){
+    histHtml = `<div style="padding:0 22px;">` + [...visits].reverse().map((v, idx) => {
+      const num = visits.length - idx;
+      const d = new Date(v.date + 'T00:00');
+      const dateStr = `${weekdayLabel[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+      return `<div class="loyalty-history-item">
+        <div class="loyalty-history-num">${num}</div>
+        <div class="loyalty-history-info">
+          <strong>${v.serviceName || 'Atendimento'}</strong>
+          <span>${dateStr}</span>
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
+  } else {
+    histHtml = `<div style="padding:12px 22px; font-size:.82rem; color:var(--muted); text-align:center;">Nenhuma visita validada ainda.</div>`;
+  }
+
+  document.getElementById('loyaltyModalBody').innerHTML = `
+    <div class="loyalty-card" style="margin:18px 22px;">
+      <div class="loyalty-header">
+        <div>
+          <div class="loyalty-title">Cartão Fidelidade</div>
+          <div class="loyalty-sub">Monteiro Barbearia</div>
+        </div>
+        <div class="loyalty-badge">${total}/${TOTAL}</div>
+      </div>
+      <div class="loyalty-progress-wrap">
+        <div class="loyalty-progress-bar" style="width:${pct}%"></div>
+      </div>
+      ${nextMsg}
+      <div class="loyalty-grid">${sealsHtml}</div>
+      <div class="loyalty-legend">
+        <span class="loyalty-dot filled"></span> Visita validada &nbsp;&nbsp;
+        <span class="loyalty-dot"></span> Aguardando
+      </div>
+    </div>
+    <div style="padding:0 22px 4px; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--red); display:flex; align-items:center; gap:10px;">
+      <span>Histórico de visitas</span><div style="flex:1;height:1px;background:var(--red-dim);"></div>
+    </div>
+    ${histHtml}
+  `;
+}
+
+function closeLoyaltyModalDirect(){
+  document.getElementById('loyaltyModalOverlay').classList.remove('show');
+}
+function closeLoyaltyModal(e){
+  if(e.target === document.getElementById('loyaltyModalOverlay')) closeLoyaltyModalDirect();
+}
+
 /* ===================== ADMIN · CLIENTES ===================== */
 let clientesCache = [];
 async function renderClientesTab(){
@@ -2545,7 +2705,7 @@ async function renderClientesTab(){
     const waLink = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(waText)}` : '';
 
     return `
-      <div class="client-card ${colorClass}">
+      <div class="client-card ${colorClass}" onclick="openLoyaltyModal('${(c.name||'').replace(/'/g,"\\'")}','${String(c.phone||'').replace(/\D/g,'')}',${loyalty})">
         <div class="client-card-top">
           <div>
             <div class="client-name">${c.name || 'Sem nome'}</div>
