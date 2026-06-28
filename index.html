@@ -1339,11 +1339,11 @@ function fmtDateLong(iso){
   const d = new Date(iso+'T00:00');
   return `${weekdayFull[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}`;
 }
-function toast(msg){
+function toast(msg, duration=2200){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2200);
+  setTimeout(()=>t.classList.remove('show'), duration);
 }
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -1896,10 +1896,11 @@ async function validateClientVisit(phone, serviceName, date, bookingId){
   validatedBookingIds.add(String(bookingId));
   renderAgendaApptList();
   const total = res.total;
-  let msg = `✓ Visita validada! ${serviceName} · ${total}/10`;
-  if(total === 5)  msg = `⭐ 10% OFF desbloqueado para ${phone}!`;
-  if(total >= 10) msg = `🎉 Serviço GRÁTIS desbloqueado para ${phone}!`;
-  toast(msg);
+  let msg = `✓ Visita validada! ${serviceName} · ${total}/11`;
+  if(total === 6)  msg = `⭐ 10% OFF desbloqueado para este cliente!`;
+  if(total === 10) msg = `🎉 BRINDE desbloqueado! Cliente tem direito a 1 serviço GRÁTIS!`;
+  if(total === 11) msg = `✅ Brinde utilizado! Cartão pode ser zerado agora.`;
+  toast(msg, total >= 10 ? 5000 : 3000);
 }
 async function adminCancelBooking(id){
   const res = await apiPost('cancelBooking', { id });
@@ -2644,7 +2645,10 @@ async function saveAdminBooking(){
 }
 
 /* ===================== ADMIN · MODAL FIDELIDADE CLIENTE ===================== */
+let loyaltyModalCurrentPhone = '';
+
 async function openLoyaltyModal(name, phone, loyaltyCount){
+  loyaltyModalCurrentPhone = phone;
   document.getElementById('loyaltyModalName').textContent = name || 'Cliente';
   const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '';
   document.getElementById('loyaltyModalPhone').textContent = phoneFormatted;
@@ -2675,6 +2679,12 @@ function renderLoyaltyModalBody(name, total, visits){
     ? `<div style="padding:0 22px;">${buildHistoryHTML(visits)}</div>`
     : `<div style="padding:12px 22px; font-size:.82rem; color:var(--muted); text-align:center;">Nenhuma visita validada ainda.</div>`;
 
+  const resetBtn = total >= 10 ? `
+    <div style="margin:14px 0 0; padding:12px 14px; background:rgba(63,174,102,.08); border:1px solid rgba(63,174,102,.25); border-radius:10px;">
+      <div style="font-size:.78rem; color:var(--green-bright); margin-bottom:10px;">🎉 Cliente com direito ao serviço GRÁTIS! Após o uso do brinde, zere o cartão.</div>
+      <button class="btn btn-green" style="width:100%;" onclick="confirmResetLoyalty('${(name||'').replace(/'/g,"\\'")}')">🔄 Zerar cartão fidelidade</button>
+    </div>` : '';
+
   document.getElementById('loyaltyModalBody').innerHTML = `
     <div class="loyalty-card" style="margin:18px 22px;">
       <div class="loyalty-header">
@@ -2693,6 +2703,7 @@ function renderLoyaltyModalBody(name, total, visits){
         <span class="loyalty-dot filled"></span> Visita validada &nbsp;&nbsp;
         <span class="loyalty-dot"></span> Aguardando
       </div>
+      ${resetBtn}
     </div>
     <div style="padding:0 22px 4px; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--red); display:flex; align-items:center; gap:10px;">
       <span>Histórico de visitas</span><div style="flex:1;height:1px;background:var(--red-dim);"></div>
@@ -2706,6 +2717,24 @@ function closeLoyaltyModalDirect(){
 }
 function closeLoyaltyModal(e){
   if(e.target === document.getElementById('loyaltyModalOverlay')) closeLoyaltyModalDirect();
+}
+
+function confirmResetLoyalty(name){
+  if(!confirm(`Confirma o uso do brinde e zeramento do cartão de ${name}?\n\nEsta ação irá apagar todas as visitas do cartão fidelidade atual.`)) return;
+  resetLoyaltyCard(name);
+}
+
+async function resetLoyaltyCard(name){
+  const phone = loyaltyModalCurrentPhone;
+  if(!phone){ toast('Erro: telefone não encontrado'); return; }
+  toast('Zerando cartão...');
+  const res = await apiPost('resetLoyalty', { phone });
+  if(res.error){ toast('Erro: ' + res.error); return; }
+  // Atualiza o cache de clientes
+  const idx = clientesCache.findIndex(c => String(c.phone).replace(/\D/g,'') === phone);
+  if(idx !== -1) clientesCache[idx].loyaltyCount = 0;
+  toast(`✅ Cartão de ${name} zerado! Novo ciclo iniciado.`, 4000);
+  renderLoyaltyModalBody(name, 0, []);
 }
 
 /* ===================== ADMIN · CLIENTES ===================== */
