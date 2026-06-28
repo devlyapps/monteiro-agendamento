@@ -288,6 +288,60 @@
   .sticky-bar .total strong{font-family:'Playfair Display',serif; font-size:1.3rem; color:var(--red-bright);}
   .sticky-bar .btn{flex:none; width:auto; padding:14px 26px;}
 
+  /* ---------- MODAL DE HORÁRIOS DO DIA (ADMIN) ---------- */
+  .day-slots-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.82); backdrop-filter:blur(5px);
+    display:none; align-items:flex-end; justify-content:center; z-index:60; padding:0;
+  }
+  .day-slots-overlay.show{display:flex;}
+  .day-slots-sheet{
+    width:100%; max-width:430px; background:var(--surface); border-radius:22px 22px 0 0;
+    border-top:1px solid var(--red-dim); padding:0 0 32px;
+    animation:slideUp .3s ease; max-height:88vh; display:flex; flex-direction:column;
+  }
+  @keyframes slideUp{from{transform:translateY(100%);} to{transform:translateY(0);}}
+  .day-slots-handle{
+    width:36px; height:4px; background:var(--muted-2); border-radius:2px;
+    margin:12px auto 0;
+  }
+  .day-slots-header{
+    padding:16px 22px 12px; display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--red-dim); flex:none;
+  }
+  .day-slots-header h3{font-size:1rem; font-weight:600; font-family:'Playfair Display',serif;}
+  .day-slots-header span{font-size:.78rem; color:var(--muted);}
+  .day-slots-body{overflow-y:auto; padding:16px 22px 0; flex:1;}
+  .day-slot-row{
+    display:flex; align-items:center; gap:14px;
+    padding:12px 14px; border-radius:12px; margin-bottom:8px;
+    border:1px solid rgba(196,60,45,.12); background:var(--surface-2);
+    cursor:pointer; transition:all .15s;
+  }
+  .day-slot-row.slot-taken{
+    cursor:default; opacity:.85;
+    border-color:rgba(196,60,45,.2); background:rgba(196,60,45,.06);
+  }
+  .day-slot-row.slot-free:hover{
+    border-color:var(--red); background:rgba(196,60,45,.1);
+  }
+  .day-slot-time{
+    font-size:.95rem; font-weight:700; color:var(--red-bright);
+    font-family:'Playfair Display',serif; min-width:46px; flex:none;
+  }
+  .day-slot-info{flex:1; min-width:0;}
+  .day-slot-info strong{display:block; font-size:.88rem; color:var(--cream); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .day-slot-info span{font-size:.74rem; color:var(--muted);}
+  .day-slot-badge{
+    font-size:.68rem; padding:3px 8px; border-radius:999px; flex:none;
+  }
+  .badge-taken{background:rgba(196,60,45,.15); color:var(--red-bright); border:1px solid rgba(196,60,45,.3);}
+  .badge-free{background:rgba(63,174,102,.12); color:var(--green-bright); border:1px solid rgba(63,174,102,.3);}
+  .day-slots-new-form{
+    border:1px solid var(--red-dim); border-radius:var(--radius);
+    padding:16px; margin-top:10px; background:var(--bg); animation:fadeSlide .25s ease;
+  }
+  .day-slots-new-form h4{font-size:.88rem; margin-bottom:12px; color:var(--red-bright);}
+
   /* ---------- POPUP DE SUCESSO ---------- */
   .modal-overlay{
     position:fixed; inset:0; background:rgba(0,0,0,.78); backdrop-filter:blur(4px);
@@ -963,6 +1017,23 @@
   </nav>
 
   <div class="toast" id="toast"></div>
+
+  <!-- ============ MODAL HORÁRIOS DO DIA (ADMIN) ============ -->
+  <div class="day-slots-overlay" id="daySlotsOverlay" onclick="closeDaySlots(event)">
+    <div class="day-slots-sheet">
+      <div class="day-slots-handle"></div>
+      <div class="day-slots-header">
+        <div>
+          <h3 id="daySlotsTitle">Horários do dia</h3>
+          <span id="daySlotsSubtitle"></span>
+        </div>
+        <button class="icon-btn" onclick="closeDaySlotsModal()" style="flex:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="day-slots-body" id="daySlotsBody"></div>
+    </div>
+  </div>
 
   <!-- ============ POPUP DE SUCESSO ============ -->
   <div class="modal-overlay" id="successModal">
@@ -2039,7 +2110,7 @@ function selectAgendaStaff(id){ selectedAgendaStaff = id; renderAgendaStaffChips
 function agendaCalPrev(){ agendaCalMonth--; if(agendaCalMonth<0){agendaCalMonth=11;agendaCalYear--;} renderAgendaCal(); }
 function agendaCalNext(){ agendaCalMonth++; if(agendaCalMonth>11){agendaCalMonth=0;agendaCalYear++;} renderAgendaCal(); }
 function agendaCalToday(){ const now=new Date(); agendaCalYear=now.getFullYear(); agendaCalMonth=now.getMonth(); agendaSelectedDate=isoOffset(0); renderAgendaCal(); renderAgendaApptList(); }
-function agendaCalSelectDay(iso){ agendaSelectedDate=iso; renderAgendaCal(); renderAgendaApptList(); }
+function agendaCalSelectDay(iso){ agendaSelectedDate=iso; renderAgendaCal(); renderAgendaApptList(); openDaySlots(iso); }
 function clearAgendaFilters(){ agendaCalToday(); }
 function renderAgendaCal(){
   const label=document.getElementById('calMonthLabel'); if(label) label.textContent=`${monthNames[agendaCalMonth]} ${agendaCalYear}`;
@@ -2109,6 +2180,171 @@ function renderAgendaApptList(){
   }).join('');
 }
 
+
+/* ===================== MODAL · HORÁRIOS DO DIA ===================== */
+let daySlotsDate = null;
+let daySlotsNewSlot = null;
+
+function openDaySlots(iso){
+  if(!selectedAgendaStaff) return;
+  daySlotsDate = iso;
+  daySlotsNewSlot = null;
+
+  const prof = professionals.find(p => p.id === selectedAgendaStaff);
+  const ds = new Date(iso+'T00:00');
+  const dateLabel = `${weekdayFull[ds.getDay()]}, ${String(ds.getDate()).padStart(2,'0')} de ${monthNames[ds.getMonth()]}`;
+
+  document.getElementById('daySlotsTitle').textContent = dateLabel;
+  document.getElementById('daySlotsSubtitle').textContent = prof ? prof.name : '';
+  document.getElementById('daySlotsOverlay').classList.add('show');
+  renderDaySlotsBody();
+}
+
+function closeDaySlotsModal(){
+  document.getElementById('daySlotsOverlay').classList.remove('show');
+  daySlotsDate = null;
+  daySlotsNewSlot = null;
+}
+
+function closeDaySlots(e){
+  if(e.target === document.getElementById('daySlotsOverlay')) closeDaySlotsModal();
+}
+
+function renderDaySlotsBody(){
+  const wrap = document.getElementById('daySlotsBody');
+  if(!wrap || !daySlotsDate || !selectedAgendaStaff){ return; }
+
+  const slots = generateSlots(daySlotsDate, selectedAgendaStaff);
+  if(!slots.length){
+    wrap.innerHTML = `<div class="empty-note">Sem horários disponíveis neste dia (fechado ou bloqueado).</div>
+      <button class="btn btn-ghost" style="margin-top:12px;" onclick="closeDaySlotsModal()">Fechar</button>`;
+    return;
+  }
+
+  const dayBookings = bookings.filter(b => b.profId === selectedAgendaStaff && String(b.date).slice(0,10) === daySlotsDate);
+
+  let html = '';
+  slots.forEach(slot => {
+    const booking = dayBookings.find(b => toHHmm(b.time) === slot.time);
+    if(booking){
+      const s = services.find(x => x.id === booking.serviceId);
+      html += `
+        <div class="day-slot-row slot-taken">
+          <div class="day-slot-time">${slot.time}</div>
+          <div class="day-slot-info">
+            <strong>${booking.clientName || 'Cliente'}</strong>
+            <span>${s ? s.name : 'Serviço'}</span>
+          </div>
+          <span class="day-slot-badge badge-taken">Ocupado</span>
+        </div>`;
+    } else if(slot.available){
+      html += `
+        <div class="day-slot-row slot-free" onclick="selectDaySlotForBooking('${slot.time}')">
+          <div class="day-slot-time">${slot.time}</div>
+          <div class="day-slot-info">
+            <strong>Horário livre</strong>
+            <span>Clique para agendar</span>
+          </div>
+          <span class="day-slot-badge badge-free">Livre</span>
+        </div>`;
+    } else {
+      // passado ou pausa
+      html += `
+        <div class="day-slot-row slot-taken" style="opacity:.4;">
+          <div class="day-slot-time">${slot.time}</div>
+          <div class="day-slot-info"><strong style="color:var(--muted);">Indisponível</strong></div>
+        </div>`;
+    }
+  });
+
+  html += `<div id="daySlotsFormArea"></div><div style="height:16px;"></div>`;
+  wrap.innerHTML = html;
+}
+
+function selectDaySlotForBooking(time){
+  daySlotsNewSlot = time;
+  // Remove destaque anterior
+  document.querySelectorAll('.day-slot-row.slot-free').forEach(el => el.style.borderColor = '');
+  // Destaca o selecionado
+  const rows = document.querySelectorAll('.day-slot-row.slot-free');
+  rows.forEach(el => {
+    if(el.querySelector('.day-slot-time') && el.querySelector('.day-slot-time').textContent.trim() === time){
+      el.style.borderColor = 'var(--red-bright)';
+    }
+  });
+  renderDaySlotsForm(time);
+}
+
+function renderDaySlotsForm(time){
+  const area = document.getElementById('daySlotsFormArea');
+  if(!area) return;
+  area.innerHTML = `
+    <div class="day-slots-new-form">
+      <h4>Agendar às ${time}</h4>
+      <div class="field"><label>Nome do cliente</label><input id="dsName" type="text" placeholder="Nome completo"></div>
+      <div class="field"><label>Telefone (opcional)</label><input id="dsPhone" type="tel" placeholder="(11) 99999-9999" oninput="maskPhone(this)"></div>
+      <div class="field">
+        <label>Serviço</label>
+        <select id="dsService">
+          ${services.map(s => `<option value="${s.id}">${s.name} — R$ ${s.price}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Pagamento</label>
+        <select id="dsPayment">
+          <option value="Pix">Pix</option>
+          <option value="Crédito">Cartão Crédito</option>
+          <option value="Débito">Cartão Débito</option>
+          <option value="Dinheiro">Dinheiro</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        <button class="btn btn-green" style="flex:1;" onclick="saveDaySlotBooking('${time}')">Agendar</button>
+        <button class="btn btn-ghost" style="flex:1;" onclick="cancelDaySlotsForm()">Cancelar</button>
+      </div>
+    </div>`;
+  area.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function cancelDaySlotsForm(){
+  daySlotsNewSlot = null;
+  const area = document.getElementById('daySlotsFormArea');
+  if(area) area.innerHTML = '';
+  document.querySelectorAll('.day-slot-row.slot-free').forEach(el => el.style.borderColor = '');
+}
+
+async function saveDaySlotBooking(time){
+  const name      = (document.getElementById('dsName')?.value || '').trim();
+  const phone     = (document.getElementById('dsPhone')?.value || '').replace(/\D/g,'');
+  const serviceId = Number(document.getElementById('dsService')?.value);
+  const payment   = document.getElementById('dsPayment')?.value || 'Pix';
+
+  if(!name){ toast('Digite o nome do cliente'); return; }
+  if(!daySlotsDate){ toast('Erro: data não definida'); return; }
+
+  toast('Gravando...');
+  const res = await apiPost('addBooking', {
+    serviceId, profId: selectedAgendaStaff,
+    date: daySlotsDate, time,
+    clientName: name, clientPhone: phone, payment
+  });
+  if(res.error){ toast(res.error); return; }
+
+  bookings.push({
+    id: res.id, serviceId, profId: selectedAgendaStaff,
+    date: daySlotsDate, time, clientName: name, clientPhone: phone, payment
+  });
+
+  toast(`✅ ${name} agendado às ${time}!`);
+  renderDaySlotsBody();
+
+  // Atualiza o calendário e lista por baixo
+  const d = new Date(daySlotsDate+'T00:00');
+  agendaCalYear  = d.getFullYear();
+  agendaCalMonth = d.getMonth();
+  agendaSelectedDate = daySlotsDate;
+  renderAgendaApptList();
+}
 
 /* ===================== BLOQUEIO DE AGENDA ===================== */
 function renderBlockedRanges(){
