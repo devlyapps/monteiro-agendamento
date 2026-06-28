@@ -1167,7 +1167,21 @@
     </div>
   </div>
 
-  <!-- ============ POPUP DE SUCESSO ============ -->
+  <!-- ============ TELA PRIMEIRO ACESSO ADMIN ============ -->
+  <section class="screen no-nav" id="screen-admin-first-access">
+    <div class="auth-card">
+      <div style="text-align:center; margin-bottom:24px;">
+        <div style="font-size:2rem; margin-bottom:8px;">🔐</div>
+        <h2 class="serif" style="font-size:1.4rem; margin-bottom:6px;">Primeiro acesso</h2>
+        <p style="font-size:.82rem; color:var(--muted);">Por segurança, defina uma senha personalizada para o painel administrativo.</p>
+      </div>
+      <div>
+        <div class="field"><label>Nova senha</label><input id="newAdminPass" type="password" placeholder="Mínimo 6 caracteres"></div>
+        <div class="field"><label>Confirmar senha</label><input id="confirmAdminPass" type="password" placeholder="Repita a nova senha"></div>
+        <button class="btn btn-gold" type="button" onclick="saveNewAdminPass()">Salvar e entrar</button>
+      </div>
+    </div>
+  </section>
   <div class="modal-overlay" id="successModal">
     <div class="modal-card">
       <div class="confirm-icon">
@@ -1274,7 +1288,8 @@ const avatarPalette = [
 let professionals = [];
 
 // Credenciais fixas do admin (mock). Em produção: usuário/senha com hash, validado no backend.
-const ADMIN_CREDENTIALS = {user:'admin', pass:'123456'};
+const ADMIN_CREDENTIALS = {user:'admin', pass:'987654'};
+const ADMIN_DEFAULT_PASS = '123456'; // senha padrão para novos clientes
 
 // Configuração de funcionamento — valores padrão de segurança até o backend responder
 let businessConfig = {
@@ -1535,15 +1550,51 @@ function finishLogin(){
   updateReminderBanner();
   saveSession();
 }
-function doAdminLogin(){
+async function doAdminLogin(){
   const u = document.getElementById('adminUser').value.trim();
   const p = document.getElementById('adminPass').value;
-  if(u === ADMIN_CREDENTIALS.user && p === ADMIN_CREDENTIALS.pass){
+
+  if(u !== ADMIN_CREDENTIALS.user){ toast('Usuário ou senha incorretos'); return; }
+
+  // Primeiro acesso com senha padrão
+  if(p === ADMIN_DEFAULT_PASS){
+    // Verifica se já tem senha salva no Sheets
+    toast('Verificando...');
+    const res = await apiPost('getAdminPass', {});
+    if(res.customPass){
+      // Já tem senha personalizada — senha padrão não é mais válida
+      toast('Usuário ou senha incorretos');
+      return;
+    }
+    // Ainda não tem senha personalizada — primeiro acesso
+    showScreen('screen-admin-first-access');
+    document.getElementById('bottomNav').style.display = 'none';
+    return;
+  }
+
+  // Verifica senha personalizada salva no Sheets
+  toast('Verificando...');
+  const res = await apiPost('getAdminPass', {});
+  const validPass = res.customPass || ADMIN_CREDENTIALS.pass;
+
+  if(p === validPass){
     enterAdmin();
     toast('Bem-vindo, administrador');
   } else {
     toast('Usuário ou senha incorretos');
   }
+}
+
+async function saveNewAdminPass(){
+  const newPass = document.getElementById('newAdminPass').value;
+  const confirmPass = document.getElementById('confirmAdminPass').value;
+  if(newPass.length < 6){ toast('A senha deve ter pelo menos 6 caracteres'); return; }
+  if(newPass !== confirmPass){ toast('As senhas não coincidem'); return; }
+  toast('Salvando...');
+  const res = await apiPost('saveAdminPass', { pass: newPass });
+  if(res.error){ toast('Erro: ' + res.error); return; }
+  toast('✅ Senha definida com sucesso!');
+  enterAdmin();
 }
 function enterAdmin(){
   state.isAdmin = true;
