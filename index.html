@@ -968,6 +968,18 @@
         <div id="blockedRangesList" style="margin-top:10px;"></div>
       </div>
 
+      <div class="admin-block" style="margin-top:8px;"><h3>Bloquear horário específico</h3></div>
+      <div class="admin-day">
+        <p style="font-size:.8rem; color:var(--muted); margin-bottom:12px;">Bloqueia uma faixa de horário em um dia específico. O resto do dia continua disponível.</p>
+        <div class="field"><label>Dia</label><input id="blockSlotDate" type="date"></div>
+        <div class="admin-times">
+          <div class="field"><label>Das</label><input id="blockSlotFrom" type="time" value="12:00"></div>
+          <div class="field"><label>Até</label><input id="blockSlotTo" type="time" value="14:00"></div>
+        </div>
+        <button class="btn btn-ghost" style="margin-top:10px; width:100%;" onclick="addBlockedSlot()">+ Adicionar bloqueio de horário</button>
+        <div id="blockedSlotsList" style="margin-top:10px;"></div>
+      </div>
+
       <div class="save-wrap">
         <button class="btn btn-gold" onclick="saveAdminConfig()">Salvar configurações</button>
       </div>
@@ -1295,6 +1307,7 @@ let businessConfig = {
   breakEnd: '13:00',
   bookingWindow: 30,
   blockedRanges: [],
+  blockedSlots: [],
   breaks: {},
   hours: {
     0: {closed:true,  open:'08:00', close:'18:00'},
@@ -1749,7 +1762,15 @@ function generateSlots(dateIso, profId){
     const onBreak = bStart >= 0 && cur >= bStart && cur < bEnd;
     const taken = bookings.some(b => b.profId===profId && b.date===dateIso && b.time===time);
     const pastToday = isToday && cur < nowMin;
-    slots.push({time, available: !onBreak && !taken && !pastToday});
+    // Verifica bloqueios de horário específico
+    const blockedSlots = businessConfig.blockedSlots || [];
+    const onBlockedSlot = blockedSlots.some(s => {
+      if(s.date !== dateIso) return false;
+      const [fh,fm] = s.from.split(':').map(Number);
+      const [th,tm] = s.to.split(':').map(Number);
+      return cur >= fh*60+fm && cur < th*60+tm;
+    });
+    slots.push({time, available: !onBreak && !taken && !pastToday && !onBlockedSlot});
     cur += businessConfig.interval;
   }
   return slots;
@@ -2615,15 +2636,52 @@ function renderBlockedRanges(){
   const wrap = document.getElementById('blockedRangesList');
   if(!wrap) return;
   const ranges = businessConfig.blockedRanges || [];
-  if(!ranges.length){ wrap.innerHTML = ''; return; }
-  wrap.innerHTML = ranges.map((r,i) => `
+  if(!ranges.length){ wrap.innerHTML = ''; }
+  else {
+    wrap.innerHTML = ranges.map((r,i) => `
+      <div style="display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid rgba(196,60,45,.2); border-radius:8px; padding:10px 14px; margin-top:8px;">
+        <span style="font-size:.85rem; color:var(--cream);">${r.from} → ${r.to}</span>
+        <button class="icon-btn small danger" onclick="removeBlockedRange(${i})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    `).join('');
+  }
+  // Renderiza bloqueios de horário
+  const slotsWrap = document.getElementById('blockedSlotsList');
+  if(!slotsWrap) return;
+  const slots = businessConfig.blockedSlots || [];
+  if(!slots.length){ slotsWrap.innerHTML = ''; return; }
+  slotsWrap.innerHTML = slots.map((s,i) => `
     <div style="display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid rgba(196,60,45,.2); border-radius:8px; padding:10px 14px; margin-top:8px;">
-      <span style="font-size:.85rem; color:var(--cream);">${r.from} → ${r.to}</span>
-      <button class="icon-btn small danger" onclick="removeBlockedRange(${i})">
+      <span style="font-size:.85rem; color:var(--cream);">📅 ${s.date} · ${s.from} → ${s.to}</span>
+      <button class="icon-btn small danger" onclick="removeBlockedSlot(${i})">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
   `).join('');
+}
+
+function addBlockedSlot(){
+  const date = document.getElementById('blockSlotDate').value;
+  const from = document.getElementById('blockSlotFrom').value;
+  const to   = document.getElementById('blockSlotTo').value;
+  if(!date){ toast('Selecione o dia'); return; }
+  if(!from || !to){ toast('Selecione os horários de início e fim'); return; }
+  if(from >= to){ toast('O horário de início deve ser antes do fim'); return; }
+  if(!businessConfig.blockedSlots) businessConfig.blockedSlots = [];
+  businessConfig.blockedSlots.push({ date, from, to });
+  document.getElementById('blockSlotDate').value = '';
+  document.getElementById('blockSlotFrom').value = '12:00';
+  document.getElementById('blockSlotTo').value   = '14:00';
+  renderBlockedRanges();
+  toast('Horário bloqueado — clique em Salvar para confirmar');
+}
+
+function removeBlockedSlot(i){
+  businessConfig.blockedSlots.splice(i, 1);
+  renderBlockedRanges();
+  toast('Bloqueio removido — clique em Salvar para confirmar');
 }
 function addBlockedRange(){
   const from = document.getElementById('blockFrom').value;
