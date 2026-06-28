@@ -428,7 +428,8 @@
     background:rgba(196,60,45,.1); border:1px solid rgba(196,60,45,.2);
     border-radius:8px; padding:8px 12px; text-align:center; letter-spacing:.02em;
   }
-  .loyalty-grid{display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:14px;}
+  .loyalty-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:18px;}
+  .loyalty-grid .loyalty-row-2{grid-column:1/-1; display:grid; grid-template-columns:repeat(6,1fr); gap:10px;}
   .loyalty-seal{
     aspect-ratio:1; border-radius:50%; display:flex; align-items:center; justify-content:center;
     position:relative; flex-direction:column;
@@ -447,14 +448,26 @@
   }
   .loyalty-seal.filled .seal-num{color:rgba(255,255,255,.7);}
   .loyalty-seal.special-5 .discount-badge{
-    position:absolute; bottom:-7px; left:50%; transform:translateX(-50%);
-    background:var(--green); color:#0a1f0a; font-size:.55rem; font-weight:800;
+    position:absolute; bottom:-8px; left:50%; transform:translateX(-50%);
+    background:var(--green); color:#0a1f0a; font-size:.52rem; font-weight:800;
     padding:2px 5px; border-radius:5px; white-space:nowrap; letter-spacing:.04em;
   }
-  .loyalty-seal.special-10 .discount-badge{
-    position:absolute; bottom:-7px; left:50%; transform:translateX(-50%);
-    background:var(--red-bright); color:#fff; font-size:.52rem; font-weight:800;
+  .loyalty-seal.special-11{
+    border:2px dashed rgba(212,175,55,.5); background:rgba(212,175,55,.06);
+  }
+  .loyalty-seal.special-11.filled{
+    background:radial-gradient(circle at 35% 35%, #f5d060, #c9a227);
+    border:2px solid #f5d060; box-shadow:0 4px 16px rgba(212,175,55,.5);
+  }
+  .loyalty-seal.special-11 .discount-badge{
+    position:absolute; bottom:-8px; left:50%; transform:translateX(-50%);
+    background:linear-gradient(135deg,#f5d060,#c9a227); color:#3a2800;
+    font-size:.52rem; font-weight:800;
     padding:2px 5px; border-radius:5px; white-space:nowrap; letter-spacing:.04em;
+    box-shadow:0 1px 4px rgba(0,0,0,.3);
+  }
+  .loyalty-seal.special-11.empty .gift-icon{
+    font-size:1.1rem; opacity:.4;
   }
   .loyalty-legend{display:flex; align-items:center; font-size:.72rem; color:var(--muted);}
   .loyalty-dot{display:inline-block; width:8px; height:8px; border-radius:50%; border:1.5px dashed rgba(196,60,45,.4); margin-right:5px;}
@@ -1323,23 +1336,33 @@ function renderLoyaltyCard(total, visits){
   // Grade de selos
   const grid = document.getElementById('loyaltyGrid');
   let html = '';
-  for(let i = 1; i <= LOYALTY_TOTAL; i++){
+  // Linha 1: selos 1-5
+  let row1 = '';
+  for(let i = 1; i <= 5; i++){
     const filled = i <= total;
-    const is5  = i === 5;
-    const is10 = i === 11;
+    const is5 = i === 5;
     let cls = `loyalty-seal ${filled ? 'filled' : 'empty'}`;
-    if(is5)  cls += ' special-5';
-    if(is10) cls += ' special-10';
-    const icon = filled
-      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-           <circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/>
-           <path d="M8.5 8L20 19M8.5 16L20 5M6 8.5v7"/>
-         </svg>`
-      : '';
-    const badge = is5  ? `<span class="discount-badge">10% OFF</span>` :
-                  is10 ? `<span class="discount-badge">GRÁTIS</span>` : '';
-    html += `<div class="${cls}">${icon}<span class="seal-num">${i}</span>${badge}</div>`;
+    if(is5) cls += ' special-5';
+    const icon = filled ? `<img src="logo-monteiro.jpeg" alt="Monteiro" style="width:78%;height:78%;object-fit:contain;border-radius:50%;mix-blend-mode:luminosity;opacity:.95;">` : '';
+    const badge = is5 ? `<span class="discount-badge">10% OFF</span>` : '';
+    row1 += `<div class="${cls}">${icon}<span class="seal-num">${i}</span>${badge}</div>`;
   }
+  // Linha 2: selos 6-11
+  let row2 = '';
+  for(let i = 6; i <= LOYALTY_TOTAL; i++){
+    const filled = i <= total;
+    const is11 = i === 11;
+    let cls = `loyalty-seal ${filled ? 'filled' : 'empty'}`;
+    if(is11) cls += ' special-11';
+    const icon = filled
+      ? (is11
+          ? `<span style="font-size:1.3rem;">🎁</span>`
+          : `<img src="logo-monteiro.jpeg" alt="Monteiro" style="width:78%;height:78%;object-fit:contain;border-radius:50%;mix-blend-mode:luminosity;opacity:.95;">`)
+      : (is11 ? `<span class="gift-icon">🎁</span>` : '');
+    const badge = is11 ? `<span class="discount-badge">GRÁTIS</span>` : '';
+    row2 += `<div class="${cls}">${icon}<span class="seal-num">${i}</span>${badge}</div>`;
+  }
+  html = row1 + `<div class="loyalty-row-2">${row2}</div>`;
   grid.innerHTML = html;
   // Histórico
   const histEl = document.getElementById('loyaltyHistory');
@@ -2577,23 +2600,30 @@ function renderLoyaltyModalBody(name, total, visits){
     nextMsg = `<div style="background:rgba(196,60,45,.1);border:1px solid rgba(196,60,45,.2);border-radius:8px;padding:8px 12px;text-align:center;font-size:.78rem;color:var(--red-bright);margin-bottom:18px;">Faltam ${rem5} visita${rem5>1?'s':''} para 10% OFF</div>`;
   }
 
-  // Grade de selos com logo como carimbo
-  let sealsHtml = '';
-  for(let i = 1; i <= TOTAL; i++){
+  // Grade de selos — linha 1: 1-5, linha 2: 6-11
+  let sealsRow1 = '';
+  for(let i = 1; i <= 5; i++){
     const filled = i <= total;
-    const is5  = i === 5;
-    const is10 = i === 11;
+    const is5 = i === 5;
     let cls = `loyalty-seal ${filled ? 'filled' : 'empty'}`;
-    if(is5)  cls += ' special-5';
-    if(is10) cls += ' special-10';
-
-    // Logo da barbearia como carimbo
+    if(is5) cls += ' special-5';
     const stamp = filled ? `<img src="logo-monteiro.jpeg" alt="Monteiro" style="width:78%;height:78%;object-fit:contain;border-radius:50%;mix-blend-mode:luminosity;opacity:.95;">` : '';
-
-    const badge = is5  ? `<span class="discount-badge">10% OFF</span>` :
-                  is10 ? `<span class="discount-badge">GRÁTIS</span>` : '';
-    sealsHtml += `<div class="${cls}">${stamp}<span class="seal-num">${i}</span>${badge}</div>`;
+    const badge = is5 ? `<span class="discount-badge">10% OFF</span>` : '';
+    sealsRow1 += `<div class="${cls}">${stamp}<span class="seal-num">${i}</span>${badge}</div>`;
   }
+  let sealsRow2 = '';
+  for(let i = 6; i <= TOTAL; i++){
+    const filled = i <= total;
+    const is11 = i === 11;
+    let cls = `loyalty-seal ${filled ? 'filled' : 'empty'}`;
+    if(is11) cls += ' special-11';
+    const stamp = filled
+      ? (is11 ? `<span style="font-size:1.3rem;">🎁</span>` : `<img src="logo-monteiro.jpeg" alt="Monteiro" style="width:78%;height:78%;object-fit:contain;border-radius:50%;mix-blend-mode:luminosity;opacity:.95;">`)
+      : (is11 ? `<span class="gift-icon">🎁</span>` : '');
+    const badge = is11 ? `<span class="discount-badge">GRÁTIS</span>` : '';
+    sealsRow2 += `<div class="${cls}">${stamp}<span class="seal-num">${i}</span>${badge}</div>`;
+  }
+  const sealsHtml = sealsRow1 + `<div class="loyalty-row-2">${sealsRow2}</div>`;
 
   // Histórico
   let histHtml = '';
