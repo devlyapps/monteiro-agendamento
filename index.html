@@ -1696,7 +1696,10 @@ function openBooking(serviceId){
     return;
   }
   state.selectedService = services.find(s=>s.id===Number(serviceId));
-  if(!state.selectedService){ toast('Serviço não encontrado'); return; }
+  if(!state.selectedService){ 
+    toast(`Svc não encontrado. services.length=${services.length} ids=${services.map(s=>s.id).join(',')}`); 
+    return; 
+  }
   const eligible = eligibleProfessionals(serviceId);
   state.selectedProf = eligible.length ? eligible[0].id : null;
   state.selectedDate = isoOffset(0);
