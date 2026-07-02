@@ -629,6 +629,14 @@
     border:1px solid rgba(196,60,45,.12);
   }
   .admin-day-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .day-period-label{
+    font-size:.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;
+    margin:10px 0 6px; padding-top:10px; border-top:1px solid rgba(255,255,255,.05);
+  }
+  .day-period-label:first-of-type{ border-top:none; margin-top:4px; }
+  .day-closed-wrap{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .day-closed-wrap input[type=checkbox]{ width:16px; height:16px; accent-color:var(--red); cursor:pointer; }
+  .day-closed-wrap label{ font-size:.82rem; color:var(--muted); cursor:pointer; }
   .admin-day-head strong{font-size:.9rem;}
   .switch{position:relative; width:40px; height:22px; flex:none;}
   .switch input{opacity:0; width:0; height:0;}
@@ -940,11 +948,6 @@
           </select>
         </div>
       </div>
-
-      <div class="admin-block"><h3>Horários de atendimento por dia</h3>
-        <p style="font-size:.78rem; color:var(--muted); margin-top:4px;">Configure até dois períodos de atendimento por dia (antes e após o almoço).</p>
-      </div>
-      <div id="adminBreaks"></div>
 
       <div class="admin-block"><h3>Janela de agendamento</h3></div>
       <div class="admin-day">
@@ -1980,76 +1983,69 @@ async function adminCancelBooking(id){
 /* ===================== ADMIN ===================== */
 function renderAdminDays(){
   const wrap = document.getElementById('adminDays');
-  wrap.innerHTML = [1,2,3,4,5,6,0].map(dow => {
-    const cfg = businessConfig.hours[dow];
-    return `
-      <div class="admin-day">
-        <div class="admin-day-head">
-          <strong>${weekdayFull[dow]}</strong>
-          <label class="switch">
-            <input type="checkbox" data-dow="${dow}" class="dayToggle" ${!cfg.closed?'checked':''} onchange="toggleDay(${dow}, this.checked)">
-            <span class="track"></span>
-          </label>
-        </div>
-        <div class="admin-times" id="times-${dow}" style="${cfg.closed?'opacity:.3; pointer-events:none;':''}">
-          <div class="field"><label>Abre</label><input type="time" value="${cfg.open}" onchange="updateHour(${dow},'open',this.value)"></div>
-          <div class="field"><label>Fecha</label><input type="time" value="${cfg.close}" onchange="updateHour(${dow},'close',this.value)"></div>
-        </div>
-      </div>
-    `;
-  }).join('');
-  document.getElementById('adminInterval').value = businessConfig.interval;
-  if(document.getElementById('adminBookingWindow'))
-    document.getElementById('adminBookingWindow').value = businessConfig.bookingWindow || 30;
-
-  // Renderiza pausas por dia
-  renderAdminBreaks();
-  renderBlockedRanges();
-}
-
-function renderAdminBreaks(){
-  const wrap = document.getElementById('adminBreaks');
-  if(!wrap) return;
   if(!businessConfig.breaks) businessConfig.breaks = {};
   wrap.innerHTML = [1,2,3,4,5,6,0].map(dow => {
     const cfg = businessConfig.hours[dow];
     const brk = businessConfig.breaks[dow] || { active: false, open2: '13:00', close2: '18:00' };
     const isClosed = cfg && cfg.closed;
     return `
-      <div class="admin-day" style="${isClosed ? 'opacity:.4; pointer-events:none;' : ''}">
-        <div class="admin-day-head">
-          <strong style="font-size:.88rem;">${weekdayFull[dow]}</strong>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:.72rem; color:var(--muted);">2° período</span>
-            <label class="switch">
+      <div class="admin-day">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <strong style="font-size:.95rem;">${weekdayFull[dow]}</strong>
+        </div>
+        <div class="day-closed-wrap">
+          <input type="checkbox" id="closed-${dow}" ${isClosed?'checked':''}
+            onchange="toggleDay(${dow}, !this.checked)">
+          <label for="closed-${dow}">fechado</label>
+        </div>
+        <div id="day-body-${dow}" style="opacity:${isClosed?.3:1}; pointer-events:${isClosed?'none':'auto'}; transition:opacity .2s;">
+          <div class="day-period-label">HORÁRIO 1 (antes do almoço)</div>
+          <div class="admin-times">
+            <div class="field">
+              <label>Abre às</label>
+              <input type="time" value="${toHHmm(cfg?.open||'08:00')}" onchange="updateHour(${dow},'open',this.value)">
+            </div>
+            <div class="field">
+              <label>fecha às</label>
+              <input type="time" value="${toHHmm(cfg?.close||'12:00')}" onchange="updateHour(${dow},'close',this.value)">
+            </div>
+          </div>
+          <div class="day-period-label" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>HORÁRIO 2 (após o almoço)</span>
+            <label class="switch" style="margin-left:8px;">
               <input type="checkbox" ${brk.active?'checked':''} onchange="toggleBreak(${dow}, this.checked)">
               <span class="track"></span>
             </label>
           </div>
-        </div>
-        <div style="font-size:.75rem; color:var(--muted); margin:-4px 0 8px;">
-          1° período: <strong style="color:var(--cream);">${toHHmm(cfg?.open||'08:00')} → ${toHHmm(cfg?.close||'18:00')}</strong>
-          ${brk.active ? ` &nbsp;·&nbsp; 2° período: <strong style="color:var(--red-bright);">${brk.open2||'13:00'} → ${brk.close2||'18:00'}</strong>` : ''}
-        </div>
-        <div id="break-times-${dow}" style="${brk.active?'':'display:none;'}">
-          <p style="font-size:.75rem; color:var(--muted); margin-bottom:8px;">Horário após o almoço:</p>
-          <div class="admin-times">
-            <div class="field"><label>Abre às</label><input type="time" value="${brk.open2||'13:00'}" onchange="updateBreak(${dow},'open2',this.value)"></div>
-            <div class="field"><label>Fecha às</label><input type="time" value="${brk.close2||'18:00'}" onchange="updateBreak(${dow},'close2',this.value)"></div>
+          <div id="break-times-${dow}" style="${brk.active?'':'opacity:.3; pointer-events:none;'}">
+            <div class="admin-times">
+              <div class="field">
+                <label>Abre às</label>
+                <input type="time" value="${brk.open2||'13:00'}" onchange="updateBreak(${dow},'open2',this.value)">
+              </div>
+              <div class="field">
+                <label>fecha às</label>
+                <input type="time" value="${brk.close2||'18:00'}" onchange="updateBreak(${dow},'close2',this.value)">
+              </div>
+            </div>
           </div>
         </div>
       </div>`;
   }).join('');
+  document.getElementById('adminInterval').value = businessConfig.interval;
+  if(document.getElementById('adminBookingWindow'))
+    document.getElementById('adminBookingWindow').value = businessConfig.bookingWindow || 30;
+  renderBlockedRanges();
 }
+
+function renderAdminBreaks(){ /* integrado ao renderAdminDays */ }
 
 function toggleBreak(dow, active){
   if(!businessConfig.breaks) businessConfig.breaks = {};
   if(!businessConfig.breaks[dow]) businessConfig.breaks[dow] = { active: false, open2: '13:00', close2: '18:00' };
   businessConfig.breaks[dow].active = active;
   const el = document.getElementById('break-times-'+dow);
-  if(el){ el.style.display = active ? 'block' : 'none'; }
-  // Re-renderiza o resumo do dia
-  renderAdminBreaks();
+  if(el){ el.style.opacity = active ? '1' : '.3'; el.style.pointerEvents = active ? 'auto' : 'none'; }
 }
 
 function updateBreak(dow, field, value){
@@ -2059,9 +2055,8 @@ function updateBreak(dow, field, value){
 }
 function toggleDay(dow, isOpen){
   businessConfig.hours[dow].closed = !isOpen;
-  const t = document.getElementById('times-'+dow);
-  t.style.opacity = isOpen ? '1' : '.3';
-  t.style.pointerEvents = isOpen ? 'auto' : 'none';
+  const body = document.getElementById('day-body-'+dow);
+  if(body){ body.style.opacity = isOpen ? '1' : '.3'; body.style.pointerEvents = isOpen ? 'auto' : 'none'; }
 }
 function updateHour(dow, field, value){
   businessConfig.hours[dow][field] = value;
