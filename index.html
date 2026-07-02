@@ -1301,7 +1301,7 @@ const avatarPalette = [
 let professionals = [];
 
 // Credenciais fixas do admin (mock). Em produção: usuário/senha com hash, validado no backend.
-const ADMIN_CREDENTIALS = {user:'admin', pass:'987654'};
+const ADMIN_CREDENTIALS = {user:'admin', pass:'123456'};
 const ADMIN_DEFAULT_PASS = '123456'; // senha padrão para novos clientes
 
 // Configuração de funcionamento — valores padrão de segurança até o backend responder
@@ -1568,36 +1568,12 @@ function finishLogin(){
 async function doAdminLogin(){
   const u = document.getElementById('adminUser').value.trim();
   const p = document.getElementById('adminPass').value;
-
-  if(u !== ADMIN_CREDENTIALS.user){ toast('Usuário ou senha incorretos'); return; }
-
-  // Primeiro acesso com senha padrão
-  if(p === ADMIN_DEFAULT_PASS){
-    // Verifica se já tem senha salva no Sheets
-    toast('Verificando...');
-    const res = await apiPost('getAdminPass', {});
-    if(res.customPass){
-      // Já tem senha personalizada — senha padrão não é mais válida
-      toast('Usuário ou senha incorretos');
-      return;
-    }
-    // Ainda não tem senha personalizada — primeiro acesso
-    showScreen('screen-admin-first-access');
-    document.getElementById('bottomNav').style.display = 'none';
+  if(u !== ADMIN_CREDENTIALS.user || p !== ADMIN_CREDENTIALS.pass){
+    toast('Usuário ou senha incorretos');
     return;
   }
-
-  // Verifica senha personalizada salva no Sheets
-  toast('Verificando...');
-  const res = await apiPost('getAdminPass', {});
-  const validPass = res.customPass || ADMIN_CREDENTIALS.pass;
-
-  if(p === validPass){
-    enterAdmin();
-    toast('Bem-vindo, administrador');
-  } else {
-    toast('Usuário ou senha incorretos');
-  }
+  enterAdmin();
+  toast('Bem-vindo, administrador');
 }
 
 async function saveNewAdminPass(){
