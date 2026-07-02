@@ -1661,16 +1661,27 @@ document.addEventListener('click', function(e){
   if(btn){
     e.preventDefault();
     e.stopPropagation();
-    openBooking(Number(btn.dataset.book));
+    const id = Number(btn.dataset.book);
+    openBooking(id);
   }
 });
 document.addEventListener('touchend', function(e){
   const btn = e.target.closest('[data-book]');
   if(btn){
     e.preventDefault();
-    openBooking(Number(btn.dataset.book));
+    const id = Number(btn.dataset.book);
+    openBooking(id);
   }
 }, { passive: false });
+
+// DEBUG — toque em qualquer lugar mostra o elemento clicado
+document.addEventListener('touchstart', function(e){
+  const el = e.target;
+  const book = el.closest('[data-book]');
+  if(el.classList.contains('mini-btn') || book){
+    toast('DEBUG: tocou no botão id=' + (book ? book.dataset.book : el.textContent));
+  }
+}, { passive: true });
 
 /* ===================== BOOKING FLOW ===================== */
 function eligibleProfessionals(serviceId){
