@@ -941,8 +941,8 @@
         </div>
       </div>
 
-      <div class="admin-block"><h3>Intervalo de almoço / pausa</h3>
-        <p style="font-size:.78rem; color:var(--muted); margin-top:4px;">Configure a pausa de cada dia individualmente.</p>
+      <div class="admin-block"><h3>Horários de atendimento por dia</h3>
+        <p style="font-size:.78rem; color:var(--muted); margin-top:4px;">Configure até dois períodos de atendimento por dia (antes e após o almoço).</p>
       </div>
       <div id="adminBreaks"></div>
 
@@ -1710,48 +1710,49 @@ function generateSlots(dateIso, profId){
   const dow = new Date(dateIso+'T00:00').getDay();
   const cfg = businessConfig.hours[dow];
   if(!cfg || cfg.closed) return [];
+
   const [oh,om] = toHHmm(cfg.open).split(':').map(Number);
   const [ch,cm] = toHHmm(cfg.close).split(':').map(Number);
-  const start = oh*60+om, end = ch*60+cm;
 
-  // Pausa do dia específico
+  // Define os blocos de atendimento
+  const blocks = [{ start: oh*60+om, end: ch*60+cm }];
   const brk = businessConfig.breaks ? businessConfig.breaks[dow] : null;
-  let bStart = -1, bEnd = -1;
-  if(brk && brk.active && brk.start && brk.end){
-    const [bsh,bsm] = brk.start.split(':').map(Number);
-    const [beh,bem] = brk.end.split(':').map(Number);
-    bStart = bsh*60+bsm;
-    bEnd   = beh*60+bem;
-  } else if(!brk && businessConfig.breakStart && businessConfig.breakEnd){
-    // Fallback para pausa global (retrocompatibilidade)
-    const [bsh,bsm] = toHHmm(businessConfig.breakStart).split(':').map(Number);
-    const [beh,bem] = toHHmm(businessConfig.breakEnd).split(':').map(Number);
-    bStart = bsh*60+bsm;
-    bEnd   = beh*60+bem;
+  if(brk && brk.active && brk.open2 && brk.close2){
+    // Com 2° período: o 1° bloco vai só até o início do 2° período
+    // O admin configura: open (abre), close (fecha 1° período) no "Dias e horários"
+    // E open2 (abre 2° período), close2 (fecha 2° período) no "Horários de atendimento"
+    const [o2h,o2m] = brk.open2.split(':').map(Number);
+    const [c2h,c2m] = brk.close2.split(':').map(Number);
+    // Ajusta o 1° bloco para terminar onde o admin definiu (close do dia)
+    // e adiciona o 2° bloco
+    blocks[0].end = oh*60+om < o2h*60+o2m ? Math.min(ch*60+cm, o2h*60+o2m) : ch*60+cm;
+    if(o2h*60+o2m < c2h*60+c2m) blocks.push({ start: o2h*60+o2m, end: c2h*60+c2m });
   }
 
-  const today = isoOffset(0);
-  const now = new Date();
+  const today  = isoOffset(0);
+  const now    = new Date();
   const nowMin = now.getHours()*60 + now.getMinutes() + 30;
   const isToday = dateIso === today;
-  let cur = start, slots = [];
-  while(cur + businessConfig.interval <= end){
-    const h = String(Math.floor(cur/60)).padStart(2,'0');
-    const m = String(cur%60).padStart(2,'0');
-    const time = `${h}:${m}`;
-    const onBreak = bStart >= 0 && cur >= bStart && cur < bEnd;
-    const taken = bookings.some(b => b.profId===profId && b.date===dateIso && b.time===time);
-    const pastToday = isToday && cur < nowMin;
-    // Verifica bloqueios de horário específico
-    const blockedSlots = businessConfig.blockedSlots || [];
-    const onBlockedSlot = blockedSlots.some(s => {
-      if(s.date !== dateIso) return false;
-      const [fh,fm] = s.from.split(':').map(Number);
-      const [th,tm] = s.to.split(':').map(Number);
-      return cur >= fh*60+fm && cur < th*60+tm;
-    });
-    slots.push({time, available: !onBreak && !taken && !pastToday && !onBlockedSlot});
-    cur += businessConfig.interval;
+  const blockedSlots = businessConfig.blockedSlots || [];
+
+  const slots = [];
+  for(const block of blocks){
+    let cur = block.start;
+    while(cur + businessConfig.interval <= block.end){
+      const h    = String(Math.floor(cur/60)).padStart(2,'0');
+      const m    = String(cur%60).padStart(2,'0');
+      const time = `${h}:${m}`;
+      const taken = bookings.some(b => b.profId===profId && b.date===dateIso && b.time===time);
+      const pastToday = isToday && cur < nowMin;
+      const onBlockedSlot = blockedSlots.some(s => {
+        if(s.date !== dateIso) return false;
+        const [fh,fm] = s.from.split(':').map(Number);
+        const [th,tm] = s.to.split(':').map(Number);
+        return cur >= fh*60+fm && cur < th*60+tm;
+      });
+      slots.push({ time, available: !taken && !pastToday && !onBlockedSlot });
+      cur += businessConfig.interval;
+    }
   }
   return slots;
 }
@@ -2011,20 +2012,30 @@ function renderAdminBreaks(){
   if(!wrap) return;
   if(!businessConfig.breaks) businessConfig.breaks = {};
   wrap.innerHTML = [1,2,3,4,5,6,0].map(dow => {
-    const brk = businessConfig.breaks[dow] || { active: false, start: '12:00', end: '13:00' };
+    const cfg = businessConfig.hours[dow];
+    const brk = businessConfig.breaks[dow] || { active: false, open2: '13:00', close2: '18:00' };
+    const isClosed = cfg && cfg.closed;
     return `
-      <div class="admin-day">
+      <div class="admin-day" style="${isClosed ? 'opacity:.4; pointer-events:none;' : ''}">
         <div class="admin-day-head">
           <strong style="font-size:.88rem;">${weekdayFull[dow]}</strong>
-          <label class="switch">
-            <input type="checkbox" ${brk.active?'checked':''} onchange="toggleBreak(${dow}, this.checked)">
-            <span class="track"></span>
-          </label>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:.72rem; color:var(--muted);">2° período</span>
+            <label class="switch">
+              <input type="checkbox" ${brk.active?'checked':''} onchange="toggleBreak(${dow}, this.checked)">
+              <span class="track"></span>
+            </label>
+          </div>
         </div>
-        <div id="break-times-${dow}" style="${brk.active?'':'opacity:.3; pointer-events:none;'}">
+        <div style="font-size:.75rem; color:var(--muted); margin:-4px 0 8px;">
+          1° período: <strong style="color:var(--cream);">${toHHmm(cfg?.open||'08:00')} → ${toHHmm(cfg?.close||'18:00')}</strong>
+          ${brk.active ? ` &nbsp;·&nbsp; 2° período: <strong style="color:var(--red-bright);">${brk.open2||'13:00'} → ${brk.close2||'18:00'}</strong>` : ''}
+        </div>
+        <div id="break-times-${dow}" style="${brk.active?'':'display:none;'}">
+          <p style="font-size:.75rem; color:var(--muted); margin-bottom:8px;">Horário após o almoço:</p>
           <div class="admin-times">
-            <div class="field"><label>Início</label><input type="time" value="${brk.start||'12:00'}" onchange="updateBreak(${dow},'start',this.value)"></div>
-            <div class="field"><label>Fim</label><input type="time" value="${brk.end||'13:00'}" onchange="updateBreak(${dow},'end',this.value)"></div>
+            <div class="field"><label>Abre às</label><input type="time" value="${brk.open2||'13:00'}" onchange="updateBreak(${dow},'open2',this.value)"></div>
+            <div class="field"><label>Fecha às</label><input type="time" value="${brk.close2||'18:00'}" onchange="updateBreak(${dow},'close2',this.value)"></div>
           </div>
         </div>
       </div>`;
@@ -2033,15 +2044,17 @@ function renderAdminBreaks(){
 
 function toggleBreak(dow, active){
   if(!businessConfig.breaks) businessConfig.breaks = {};
-  if(!businessConfig.breaks[dow]) businessConfig.breaks[dow] = { active: false, start: '12:00', end: '13:00' };
+  if(!businessConfig.breaks[dow]) businessConfig.breaks[dow] = { active: false, open2: '13:00', close2: '18:00' };
   businessConfig.breaks[dow].active = active;
   const el = document.getElementById('break-times-'+dow);
-  if(el){ el.style.opacity = active ? '1' : '.3'; el.style.pointerEvents = active ? 'auto' : 'none'; }
+  if(el){ el.style.display = active ? 'block' : 'none'; }
+  // Re-renderiza o resumo do dia
+  renderAdminBreaks();
 }
 
 function updateBreak(dow, field, value){
   if(!businessConfig.breaks) businessConfig.breaks = {};
-  if(!businessConfig.breaks[dow]) businessConfig.breaks[dow] = { active: true, start: '12:00', end: '13:00' };
+  if(!businessConfig.breaks[dow]) businessConfig.breaks[dow] = { active: true, open2: '13:00', close2: '18:00' };
   businessConfig.breaks[dow][field] = value;
 }
 function toggleDay(dow, isOpen){
