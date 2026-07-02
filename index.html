@@ -1638,9 +1638,9 @@ function renderServices(){
   );
   const wrap = document.getElementById('serviceList');
   wrap.innerHTML = list.length ? list.map(s => `
-    <div class="service-card">
+    <div class="service-card" data-service-id="${s.id}">
       ${s.imageUrl
-        ? `<img class="service-thumb" src="${s.imageUrl.startsWith('data:') ? s.imageUrl : s.imageUrl}" alt="${s.name}">`
+        ? `<img class="service-thumb" src="${s.imageUrl}" alt="${s.name}">`
         : `<div class="service-bar"></div>`
       }
       <div class="service-info">
@@ -1649,11 +1649,28 @@ function renderServices(){
       </div>
       <div class="service-price">
         <strong>R$ ${s.price}</strong>
-        <button class="mini-btn" onclick="openBooking(${s.id})">+</button>
+        <button class="mini-btn" data-book="${s.id}">+</button>
       </div>
     </div>
   `).join('') : `<div class="empty-note">Nenhum serviço encontrado.</div>`;
 }
+
+// Event delegation para o botão de agendamento — funciona melhor no iOS Safari/PWA
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('[data-book]');
+  if(btn){
+    e.preventDefault();
+    e.stopPropagation();
+    openBooking(Number(btn.dataset.book));
+  }
+});
+document.addEventListener('touchend', function(e){
+  const btn = e.target.closest('[data-book]');
+  if(btn){
+    e.preventDefault();
+    openBooking(Number(btn.dataset.book));
+  }
+}, { passive: false });
 
 /* ===================== BOOKING FLOW ===================== */
 function eligibleProfessionals(serviceId){
