@@ -1688,7 +1688,8 @@ function eligibleProfessionals(serviceId){
   return professionals.filter(p => p.serviceIds && p.serviceIds.includes(Number(serviceId)));
 }
 function openBooking(serviceId){
-  // Verifica se está logado
+  // DEBUG
+  toast(`loggedIn=${state.loggedIn} phone=${state.userPhone} svc=${serviceId}`);
   if(!state.loggedIn){
     toast('Faça login para agendar');
     showScreen('screen-login');
