@@ -1657,10 +1657,11 @@ function renderServices(){
 
 /* ===================== BOOKING FLOW ===================== */
 function eligibleProfessionals(serviceId){
-  return professionals.filter(p => p.serviceIds && p.serviceIds.includes(serviceId));
+  return professionals.filter(p => p.serviceIds && p.serviceIds.includes(Number(serviceId)));
 }
 function openBooking(serviceId){
-  state.selectedService = services.find(s=>s.id===serviceId);
+  state.selectedService = services.find(s=>s.id===Number(serviceId));
+  if(!state.selectedService){ toast('Serviço não encontrado'); return; }
   const eligible = eligibleProfessionals(serviceId);
   state.selectedProf = eligible.length ? eligible[0].id : null;
   state.selectedDate = isoOffset(0);
