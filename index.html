@@ -1660,6 +1660,12 @@ function eligibleProfessionals(serviceId){
   return professionals.filter(p => p.serviceIds && p.serviceIds.includes(Number(serviceId)));
 }
 function openBooking(serviceId){
+  // Verifica se está logado
+  if(!state.loggedIn){
+    toast('Faça login para agendar');
+    showScreen('screen-login');
+    return;
+  }
   state.selectedService = services.find(s=>s.id===Number(serviceId));
   if(!state.selectedService){ toast('Serviço não encontrado'); return; }
   const eligible = eligibleProfessionals(serviceId);
@@ -1667,7 +1673,6 @@ function openBooking(serviceId){
   state.selectedDate = isoOffset(0);
   state.selectedSlot = null;
   state.selectedPayment = null;
-  // Inicializa o calendário do cliente no mês atual
   clientCalYear  = new Date().getFullYear();
   clientCalMonth = new Date().getMonth();
 
@@ -1740,13 +1745,28 @@ function generateSlots(dateIso, profId){
   const blockedSlots = businessConfig.blockedSlots || [];
 
   const slots = [];
+  // Monta um Set de todos os minutos ocupados por agendamentos existentes
+  // levando em conta a duração de cada serviço já marcado
+  const occupiedMins = new Set();
+  bookings.filter(b => b.profId === profId && b.date === dateIso).forEach(b => {
+    const booked = services.find(s => s.id === Number(b.serviceId));
+    const dur = booked ? Number(booked.duration) : businessConfig.interval;
+    const [bh, bm] = (b.time||'00:00').split(':').map(Number);
+    const start = bh*60+bm;
+    for(let t = start; t < start + dur; t += businessConfig.interval){
+      occupiedMins.add(t);
+    }
+  });
+
+  // Duração do serviço que está sendo consultado agora
+  const serviceDuration = state.selectedService ? Number(state.selectedService.duration) : businessConfig.interval;
+
   for(const block of blocks){
     let cur = block.start;
     while(cur + businessConfig.interval <= block.end){
       const h    = String(Math.floor(cur/60)).padStart(2,'0');
       const m    = String(cur%60).padStart(2,'0');
       const time = `${h}:${m}`;
-      const taken = bookings.some(b => b.profId===profId && b.date===dateIso && b.time===time);
       const pastToday = isToday && cur < nowMin;
       const onBlockedSlot = blockedSlots.some(s => {
         if(s.date !== dateIso) return false;
@@ -1754,7 +1774,14 @@ function generateSlots(dateIso, profId){
         const [th,tm] = s.to.split(':').map(Number);
         return cur >= fh*60+fm && cur < th*60+tm;
       });
-      slots.push({ time, available: !taken && !pastToday && !onBlockedSlot });
+      // Verifica se todos os minutos necessários para o serviço estão livres
+      let taken = false;
+      for(let t = cur; t < cur + serviceDuration; t += businessConfig.interval){
+        if(occupiedMins.has(t)){ taken = true; break; }
+      }
+      // Verifica se o serviço cabe dentro do bloco (não ultrapassa o horário de fechamento)
+      const fitsInBlock = (cur + serviceDuration) <= block.end;
+      slots.push({ time, available: !taken && !pastToday && !onBlockedSlot && fitsInBlock });
       cur += businessConfig.interval;
     }
   }
