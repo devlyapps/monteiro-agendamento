@@ -1655,57 +1655,32 @@ function renderServices(){
   `).join('') : `<div class="empty-note">Nenhum serviço encontrado.</div>`;
 }
 
-// Event delegation para o botão de agendamento — funciona melhor no iOS Safari/PWA
+// Event delegation único para botão de agendamento
 document.addEventListener('click', function(e){
   const btn = e.target.closest('[data-book]');
-  if(btn){
-    e.preventDefault();
-    e.stopPropagation();
-    const id = Number(btn.dataset.book);
-    openBooking(id);
-  }
+  if(!btn) return;
+  openBooking(Number(btn.dataset.book));
 });
-document.addEventListener('touchend', function(e){
-  const btn = e.target.closest('[data-book]');
-  if(btn){
-    e.preventDefault();
-    const id = Number(btn.dataset.book);
-    openBooking(id);
-  }
-}, { passive: false });
-
-// DEBUG — toque em qualquer lugar mostra o elemento clicado
-document.addEventListener('touchstart', function(e){
-  const el = e.target;
-  const book = el.closest('[data-book]');
-  if(el.classList.contains('mini-btn') || book){
-    toast('DEBUG: tocou no botão id=' + (book ? book.dataset.book : el.textContent));
-  }
-}, { passive: true });
 
 /* ===================== BOOKING FLOW ===================== */
 function eligibleProfessionals(serviceId){
   return professionals.filter(p => p.serviceIds && p.serviceIds.includes(Number(serviceId)));
 }
 function openBooking(serviceId){
-  // DEBUG
-  toast(`loggedIn=${state.loggedIn} phone=${state.userPhone} svc=${serviceId}`);
-  if(!state.loggedIn){
-    toast('Faça login para agendar');
-    showScreen('screen-login');
-    return;
+  const id = Number(serviceId);
+  toast('Abrindo svc=' + id + ' total=' + services.length);
+  
+  if(!state.loggedIn){ showScreen('screen-login'); return; }
+  
+  const svc = services.find(s => Number(s.id) === id);
+  if(!svc){ 
+    const ids = services.map(s=>Number(s.id)).join(',');
+    toast('Não achou id=' + id + ' em [' + ids + ']'); 
+    return; 
   }
-  try {
-    state.selectedService = Array.isArray(services) ? services.find(s=>s.id===Number(serviceId)) : null;
-    if(!state.selectedService){ 
-      toast(`Svc não encontrado. isArray=${Array.isArray(services)} len=${services?.length} ids=${Array.isArray(services)?services.map(s=>typeof s.id+':'+s.id).join(','):'N/A'}`); 
-      return; 
-    }
-  } catch(err) {
-    toast('ERRO: ' + err.message);
-    return;
-  }
-  const eligible = eligibleProfessionals(serviceId);
+  
+  state.selectedService = svc;
+  const eligible = professionals.filter(p => Array.isArray(p.serviceIds) && p.serviceIds.map(Number).includes(id));
   state.selectedProf = eligible.length ? eligible[0].id : null;
   state.selectedDate = isoOffset(0);
   state.selectedSlot = null;
@@ -1713,10 +1688,10 @@ function openBooking(serviceId){
   clientCalYear  = new Date().getFullYear();
   clientCalMonth = new Date().getMonth();
 
-  document.getElementById('bkServiceName').textContent = state.selectedService.name;
-  document.getElementById('bkServiceMeta').textContent = `${state.selectedService.duration} min · ${state.selectedService.cat}`;
-  document.getElementById('bkServicePrice').textContent = `R$ ${state.selectedService.price}`;
-  document.getElementById('bkTotal').textContent = `R$ ${state.selectedService.price}`;
+  document.getElementById('bkServiceName').textContent = svc.name;
+  document.getElementById('bkServiceMeta').textContent = `${svc.duration} min · ${svc.cat}`;
+  document.getElementById('bkServicePrice').textContent = `R$ ${svc.price}`;
+  document.getElementById('bkTotal').textContent = `R$ ${svc.price}`;
 
   renderProfessionals();
   renderClientCal();
