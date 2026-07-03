@@ -1695,7 +1695,18 @@ function openBooking(serviceId){
   } catch(e){ toast('ERRO campos: '+e.message); return; }
 
   try { renderProfessionals(); } catch(e){ toast('ERRO renderProf: '+e.message); return; }
-  try { renderClientCal(); } catch(e){ toast('ERRO renderCal: '+e.message); return; }
+  try { renderClientCal(); } catch(e){ 
+    // Mostra qual valor do businessConfig está quebrando
+    let debugInfo = 'renderCal: ' + e.message + ' | ';
+    try {
+      const h = businessConfig.hours || {};
+      Object.keys(h).forEach(dow => {
+        debugInfo += `d${dow}:o=${JSON.stringify(h[dow]?.open)},c=${JSON.stringify(h[dow]?.close)} `;
+      });
+    } catch(e2){}
+    toast(debugInfo.slice(0, 120)); 
+    return; 
+  }
   try { renderSlots(); } catch(e){ toast('ERRO renderSlots: '+e.message); return; }
   updateConfirmBtn();
   showScreen('screen-booking');
