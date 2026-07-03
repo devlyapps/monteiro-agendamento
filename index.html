@@ -1668,7 +1668,6 @@ function eligibleProfessionals(serviceId){
 }
 function openBooking(serviceId){
   const id = Number(serviceId);
-  toast('Abrindo svc=' + id + ' total=' + services.length);
   
   if(!state.loggedIn){ showScreen('screen-login'); return; }
   
@@ -1688,14 +1687,16 @@ function openBooking(serviceId){
   clientCalYear  = new Date().getFullYear();
   clientCalMonth = new Date().getMonth();
 
-  document.getElementById('bkServiceName').textContent = svc.name;
-  document.getElementById('bkServiceMeta').textContent = `${svc.duration} min · ${svc.cat}`;
-  document.getElementById('bkServicePrice').textContent = `R$ ${svc.price}`;
-  document.getElementById('bkTotal').textContent = `R$ ${svc.price}`;
+  try {
+    document.getElementById('bkServiceName').textContent = svc.name;
+    document.getElementById('bkServiceMeta').textContent = `${svc.duration} min · ${svc.cat}`;
+    document.getElementById('bkServicePrice').textContent = `R$ ${svc.price}`;
+    document.getElementById('bkTotal').textContent = `R$ ${svc.price}`;
+  } catch(e){ toast('ERRO campos: '+e.message); return; }
 
-  renderProfessionals();
-  renderClientCal();
-  renderSlots();
+  try { renderProfessionals(); } catch(e){ toast('ERRO renderProf: '+e.message); return; }
+  try { renderClientCal(); } catch(e){ toast('ERRO renderCal: '+e.message); return; }
+  try { renderSlots(); } catch(e){ toast('ERRO renderSlots: '+e.message); return; }
   updateConfirmBtn();
   showScreen('screen-booking');
 }
