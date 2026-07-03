@@ -1016,7 +1016,7 @@
     <div class="admin-tab" id="adminTab-agenda" style="display:none;">
       <div class="admin-block" style="display:flex; justify-content:space-between; align-items:center;">
         <h3>Agenda por colaborador</h3>
-        <button class="mini-btn" onclick="openAdminBookingForm()" title="Novo agendamento">+</button>
+        <button class="btn btn-gold" style="padding:8px 14px; font-size:.8rem;" onclick="openAdminBookingForm()">+ Novo Agendamento</button>
       </div>
       <div class="chip-row" id="agendaStaffChips"></div>
 
@@ -2774,6 +2774,39 @@ function openAdminBookingForm(){
           <option value="Dinheiro">Dinheiro</option>
         </select>
       </div>
+
+      <!-- BLOCO DE RECORRÊNCIA -->
+      <div style="margin-top:18px; padding:14px 16px; background:rgba(196,60,45,.06); border:1px solid rgba(196,60,45,.2); border-radius:var(--radius-sm);">
+        <div class="day-closed-wrap" style="margin-bottom:0;">
+          <input type="checkbox" id="abfRepeat" onchange="toggleRepeatBlock(this.checked)">
+          <label for="abfRepeat" style="font-size:.88rem; color:var(--cream); font-weight:500;">Repetir este agendamento...</label>
+        </div>
+        <div id="abfRepeatBlock" style="display:none; margin-top:14px;">
+          <div class="admin-times" style="margin-bottom:10px;">
+            <div class="field">
+              <label>A cada</label>
+              <input id="abfEveryDays" type="number" min="1" max="365" value="7" style="width:100%;">
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <select id="abfEveryUnit">
+                <option value="days">dias</option>
+                <option value="weeks" selected>semanas</option>
+                <option value="months">meses</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Pelo período de</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <input id="abfForMonths" type="number" min="1" max="12" value="3" style="width:80px;">
+              <span style="color:var(--muted); font-size:.85rem;">meses</span>
+            </div>
+          </div>
+          <div id="abfRepeatPreview" style="font-size:.78rem; color:var(--muted); margin-top:8px; line-height:1.6;"></div>
+        </div>
+      </div>
+
       <div style="display:flex; gap:10px; margin-top:16px;">
         <button class="btn btn-green" style="flex:1;" onclick="saveAdminBooking()">Gravar agendamento</button>
         <button class="btn btn-ghost" style="flex:1;" onclick="closeAdminBookingForm()">Cancelar</button>
@@ -2783,10 +2816,68 @@ function openAdminBookingForm(){
   renderAdminBookingSlots();
   wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
+
+function toggleRepeatBlock(active){
+  const block = document.getElementById('abfRepeatBlock');
+  if(block) block.style.display = active ? 'block' : 'none';
+  if(active) updateRepeatPreview();
+}
+
+function getRepeatDates(startDate){
+  const every = Number(document.getElementById('abfEveryDays')?.value) || 7;
+  const unit  = document.getElementById('abfEveryUnit')?.value || 'weeks';
+  const months = Number(document.getElementById('abfForMonths')?.value) || 3;
+
+  // Calcula intervalo em dias
+  let intervalDays;
+  if(unit === 'days')   intervalDays = every;
+  else if(unit === 'weeks') intervalDays = every * 7;
+  else intervalDays = every * 30; // meses aproximado
+
+  // Data limite
+  const start = new Date(startDate + 'T00:00');
+  const end   = new Date(start);
+  end.setMonth(end.getMonth() + months);
+
+  const dates = [];
+  const cur = new Date(start);
+  cur.setDate(cur.getDate() + intervalDays); // começa na próxima data
+  while(cur <= end){
+    const y  = cur.getFullYear();
+    const m  = String(cur.getMonth()+1).padStart(2,'0');
+    const d  = String(cur.getDate()).padStart(2,'0');
+    dates.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + intervalDays);
+  }
+  return dates;
+}
+
+function updateRepeatPreview(){
+  const date  = document.getElementById('abfDate')?.value;
+  const preview = document.getElementById('abfRepeatPreview');
+  if(!date || !preview) return;
+  const dates = getRepeatDates(date);
+  const warnings = [];
+  const validDates = [];
+  dates.forEach(iso => {
+    const dow = new Date(iso+'T00:00').getDay();
+    const cfg = businessConfig.hours[dow];
+    if(!cfg || cfg.closed){
+      warnings.push(`⚠️ ${iso} (${weekdayFull[dow]}) — dia fechado`);
+    } else {
+      validDates.push(iso);
+    }
+  });
+  let html = `<strong style="color:var(--cream);">${dates.length} repetição${dates.length!==1?'ões':''} gerada${dates.length!==1?'s':''}:</strong><br>`;
+  html += validDates.map(d => `✓ ${d}`).join('<br>');
+  if(warnings.length) html += `<br><br><span style="color:#f0c040;">${warnings.join('<br>')}</span>`;
+  preview.innerHTML = html;
+}
+
 let adminSelectedSlot = null;
 function renderAdminBookingSlots(){
-  const profId = Number(document.getElementById('abfProf').value);
-  const date   = document.getElementById('abfDate').value;
+  const profId = Number(document.getElementById('abfProf')?.value);
+  const date   = document.getElementById('abfDate')?.value;
   const wrap   = document.getElementById('abfSlots');
   if(!wrap) return;
   adminSelectedSlot = null;
@@ -2798,6 +2889,8 @@ function renderAdminBookingSlots(){
       ${s.time}
     </div>
   `).join('');
+  // Atualiza preview de recorrência quando a data muda
+  if(document.getElementById('abfRepeat')?.checked) updateRepeatPreview();
 }
 function selectAdminSlot(time){
   adminSelectedSlot = time;
@@ -2812,25 +2905,53 @@ function closeAdminBookingForm(){
   adminSelectedSlot = null;
 }
 async function saveAdminBooking(){
-  const name    = document.getElementById('abfName').value.trim();
-  const phone   = document.getElementById('abfPhone').value.replace(/\D/g,'');
-  const profId  = Number(document.getElementById('abfProf').value);
-  const date    = document.getElementById('abfDate').value;
+  const name      = document.getElementById('abfName').value.trim();
+  const phone     = document.getElementById('abfPhone').value.replace(/\D/g,'');
+  const profId    = Number(document.getElementById('abfProf').value);
+  const date      = document.getElementById('abfDate').value;
   const serviceId = Number(document.getElementById('abfService').value);
-  const payment = document.getElementById('abfPayment').value;
+  const payment   = document.getElementById('abfPayment').value;
+  const repeat    = document.getElementById('abfRepeat')?.checked;
+
   if(!name){ toast('Digite o nome do cliente'); return; }
   if(!date){ toast('Selecione a data'); return; }
   if(!adminSelectedSlot){ toast('Selecione um horário'); return; }
-  const s = services.find(x => x.id === serviceId);
-  toast('Gravando...');
-  const res = await apiPost('addBooking', {
-    serviceId, profId, date, time: adminSelectedSlot,
-    clientName: name, clientPhone: phone, payment
-  });
-  if(res.error){ toast(res.error); return; }
-  bookings.push({ id: res.id, serviceId, profId, date, time: adminSelectedSlot, clientName: name, clientPhone: phone, payment });
+
+  // Monta lista de datas: sempre inclui a data principal
+  const allDates = [date];
+  if(repeat){
+    const extras = getRepeatDates(date);
+    // Filtra dias fechados e avisa
+    const closed = [];
+    extras.forEach(iso => {
+      const dow = new Date(iso+'T00:00').getDay();
+      const cfg = businessConfig.hours[dow];
+      if(!cfg || cfg.closed) closed.push(iso);
+      else allDates.push(iso);
+    });
+    if(closed.length){
+      toast(`⚠️ ${closed.length} data(s) em dia fechado serão ignoradas`);
+      await new Promise(r => setTimeout(r, 1800));
+    }
+  }
+
+  toast(`Gravando ${allDates.length} agendamento${allDates.length>1?'s':''}...`);
+
+  let criados = 0;
+  let erros = 0;
+  for(const d of allDates){
+    const res = await apiPost('addBooking', {
+      serviceId, profId, date: d, time: adminSelectedSlot,
+      clientName: name, clientPhone: phone, payment
+    });
+    if(res.error){ erros++; }
+    else {
+      bookings.push({ id: res.id, serviceId, profId, date: d, time: adminSelectedSlot, clientName: name, clientPhone: phone, payment });
+      criados++;
+    }
+  }
+
   closeAdminBookingForm();
-  // Navega o calendário pra data do agendamento
   const d = new Date(date+'T00:00');
   agendaCalYear  = d.getFullYear();
   agendaCalMonth = d.getMonth();
@@ -2838,7 +2959,10 @@ async function saveAdminBooking(){
   selectedAgendaStaff = profId;
   renderAgendaStaffChips();
   renderAgendaApptList();
-  toast(`Agendamento de ${name} gravado com sucesso!`);
+
+  let msg = `✓ ${criados} agendamento${criados>1?'s':''} criado${criados>1?'s':''}!`;
+  if(erros) msg += ` (${erros} com erro)`;
+  toast(msg);
 }
 
 /* ===================== ADMIN · MODAL FIDELIDADE CLIENTE ===================== */
