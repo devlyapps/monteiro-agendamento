@@ -1722,10 +1722,20 @@ function selectProf(id){
 }
 
 function toHHmm(val){
-  if(!val) return '00:00';
-  if(typeof val === 'string' && val.match(/^\d{2}:\d{2}/)) return val.slice(0,5);
-  try{ const d = new Date(val); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
-  catch(e){ return '00:00'; }
+  if(!val && val !== 0) return '00:00';
+  try{
+    if(typeof val === 'string' && val.match(/^\d{1,2}:\d{2}/)) return val.slice(0,5);
+    if(typeof val === 'number'){
+      // Fração do dia (Google Sheets time serial)
+      const totalMin = Math.round(val * 24 * 60);
+      const h = Math.floor(totalMin / 60) % 24;
+      const m = totalMin % 60;
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+    const d = new Date(val);
+    if(isNaN(d.getTime())) return '00:00';
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  } catch(e){ return '00:00'; }
 }
 
 function generateSlots(dateIso, profId){
