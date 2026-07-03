@@ -1695,10 +1695,15 @@ function openBooking(serviceId){
     showScreen('screen-login');
     return;
   }
-  state.selectedService = services.find(s=>s.id===Number(serviceId));
-  if(!state.selectedService){ 
-    toast(`Svc não encontrado. services.length=${services.length} ids=${services.map(s=>s.id).join(',')}`); 
-    return; 
+  try {
+    state.selectedService = Array.isArray(services) ? services.find(s=>s.id===Number(serviceId)) : null;
+    if(!state.selectedService){ 
+      toast(`Svc não encontrado. isArray=${Array.isArray(services)} len=${services?.length} ids=${Array.isArray(services)?services.map(s=>typeof s.id+':'+s.id).join(','):'N/A'}`); 
+      return; 
+    }
+  } catch(err) {
+    toast('ERRO: ' + err.message);
+    return;
   }
   const eligible = eligibleProfessionals(serviceId);
   state.selectedProf = eligible.length ? eligible[0].id : null;
