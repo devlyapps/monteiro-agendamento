@@ -1676,11 +1676,7 @@ function openBooking(serviceId){
   if(!state.loggedIn){ showScreen('screen-login'); return; }
   
   const svc = services.find(s => Number(s.id) === id);
-  if(!svc){ 
-    const ids = services.map(s=>Number(s.id)).join(',');
-    toast('Não achou id=' + id + ' em [' + ids + ']'); 
-    return; 
-  }
+  if(!svc){ toast('Serviço não encontrado'); return; }
   
   state.selectedService = svc;
   const eligible = professionals.filter(p => Array.isArray(p.serviceIds) && p.serviceIds.map(Number).includes(id));
@@ -1691,27 +1687,14 @@ function openBooking(serviceId){
   clientCalYear  = new Date().getFullYear();
   clientCalMonth = new Date().getMonth();
 
-  try {
-    document.getElementById('bkServiceName').textContent = svc.name;
-    document.getElementById('bkServiceMeta').textContent = `${svc.duration} min · ${svc.cat}`;
-    document.getElementById('bkServicePrice').textContent = `R$ ${svc.price}`;
-    document.getElementById('bkTotal').textContent = `R$ ${svc.price}`;
-  } catch(e){ toast('ERRO campos: '+e.message); return; }
+  document.getElementById('bkServiceName').textContent = svc.name;
+  document.getElementById('bkServiceMeta').textContent = `${svc.duration} min · ${svc.cat}`;
+  document.getElementById('bkServicePrice').textContent = `R$ ${svc.price}`;
+  document.getElementById('bkTotal').textContent = `R$ ${svc.price}`;
 
-  try { renderProfessionals(); } catch(e){ toast('ERRO renderProf: '+e.message); return; }
-  try { renderClientCal(); } catch(e){ 
-    // Mostra qual valor do businessConfig está quebrando
-    let debugInfo = 'renderCal: ' + e.message + ' | ';
-    try {
-      const h = businessConfig.hours || {};
-      Object.keys(h).forEach(dow => {
-        debugInfo += `d${dow}:o=${JSON.stringify(h[dow]?.open)},c=${JSON.stringify(h[dow]?.close)} `;
-      });
-    } catch(e2){}
-    toast(debugInfo.slice(0, 120)); 
-    return; 
-  }
-  try { renderSlots(); } catch(e){ toast('ERRO renderSlots: '+e.message); return; }
+  renderProfessionals();
+  renderClientCal();
+  renderSlots();
   updateConfirmBtn();
   showScreen('screen-booking');
 }
