@@ -91,6 +91,47 @@
     </div>
   </div>
 
+  <div class="divider">Instalação do aplicativo</div>
+  <div class="section">
+    <div class="section-eyebrow">Antes de começar</div>
+    <h2 class="serif">Instale o app no seu celular</h2>
+    <p class="section-desc">O app da Monteiro Barbearia funciona direto do navegador — não precisa baixar nada na Play Store ou App Store. Escolha o seu sistema abaixo.</p>
+    <div class="tab-list">
+      <div class="tab-item open">
+        <div class="tab-item-header" onclick="toggleTab(this)">
+          <div class="tab-badge badge-red">🤖 Android</div>
+          <h3>Instalar pelo Chrome</h3>
+          <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="tab-item-body">
+          <div class="steps" style="margin-top:4px;">
+            <div class="step"><div class="step-num">01</div><div class="step-body"><h4>Abra o link no Google Chrome</h4><p>Acesse o endereço do app enviado pela barbearia usando o navegador Chrome.</p></div></div>
+            <div class="step"><div class="step-num">02</div><div class="step-body"><h4>Toque nos três pontinhos</h4><p>No canto superior direito da tela, toque no ícone de menu <strong>(⋮)</strong>.</p></div></div>
+            <div class="step"><div class="step-num">03</div><div class="step-body"><h4>Adicione à tela inicial</h4><p>Toque em <strong>"Adicionar à tela inicial"</strong> (ou <strong>"Instalar aplicativo"</strong>, dependendo da versão do Chrome).</p></div></div>
+            <div class="step"><div class="step-num">04</div><div class="step-body"><h4>Confirme</h4><p>Toque em <strong>"Adicionar"</strong> ou <strong>"Instalar"</strong>. O ícone do app vai aparecer na sua tela inicial.</p></div></div>
+          </div>
+          <div class="tip">Sempre abra o app pelo ícone da tela inicial — assim você recebe os lembretes de agendamento certinho.</div>
+        </div>
+      </div>
+      <div class="tab-item">
+        <div class="tab-item-header" onclick="toggleTab(this)">
+          <div class="tab-badge badge-green">🍎 iPhone (iOS)</div>
+          <h3>Instalar pelo Safari</h3>
+          <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="tab-item-body">
+          <div class="steps" style="margin-top:4px;">
+            <div class="step"><div class="step-num">01</div><div class="step-body"><h4>Abra o link no Safari</h4><p>No iPhone, a instalação só funciona pelo navegador <strong>Safari</strong> — não use Chrome ou outro navegador.</p></div></div>
+            <div class="step"><div class="step-num">02</div><div class="step-body"><h4>Toque em Compartilhar</h4><p>Toque no ícone de compartilhar (quadrado com uma seta para cima) na barra inferior da tela.</p></div></div>
+            <div class="step"><div class="step-num">03</div><div class="step-body"><h4>Adicione à Tela de Início</h4><p>Deslize a lista de opções até encontrar <strong>"Adicionar à Tela de Início"</strong> e toque nela.</p></div></div>
+            <div class="step"><div class="step-num">04</div><div class="step-body"><h4>Confirme</h4><p>Toque em <strong>"Adicionar"</strong> no canto superior direito. O ícone vai aparecer na tela inicial do seu iPhone.</p></div></div>
+          </div>
+          <div class="warn">Se você abrir o link pelo Chrome ou outro navegador no iPhone, a opção "Adicionar à Tela de Início" não vai funcionar do mesmo jeito. Use sempre o Safari.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="divider">Passo a passo</div>
   <div class="section">
     <div class="section-eyebrow">Primeiros passos</div>
@@ -165,6 +206,8 @@
     <div class="section-eyebrow">FAQ · Clientes</div>
     <h2 class="serif">Perguntas mais comuns</h2>
     <div class="faq-list">
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">O app não aparece na Play Store ou App Store. É normal? <span>▾</span></div><div class="faq-a">Sim, é normal. O app não é distribuído pelas lojas — ele é instalado direto do navegador, como mostrado na seção "Instalação do aplicativo" acima. Assim ele já fica sempre atualizado, sem precisar baixar atualizações manualmente.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Apaguei o ícone do app sem querer. E agora? <span>▾</span></div><div class="faq-a">Sem problema, basta repetir o passo a passo de instalação (Android ou iOS) usando o mesmo link de acesso enviado pela barbearia.</div></div>
       <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Esqueci minha senha. O que faço? <span>▾</span></div><div class="faq-a">Entre em contato com a barbearia pelo WhatsApp. O administrador pode redefinir o seu acesso.</div></div>
       <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Posso agendar para outra pessoa? <span>▾</span></div><div class="faq-a">Sim. Basta fazer o agendamento normalmente. No momento da confirmação, informe ao profissional que o horário é para outra pessoa.</div></div>
       <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Meu horário não foi exibido. Por quê? <span>▾</span></div><div class="faq-a">Horários passados ou já ocupados são ocultados automaticamente. Se todos os horários de um dia estiverem indisponíveis, tente outra data ou outro profissional.</div></div>
