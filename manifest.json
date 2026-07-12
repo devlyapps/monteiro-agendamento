@@ -1,11 +1,8 @@
 {
-  "name": "Monteiró Barbearia",
-  "short_name": "Monteiró",
-  "description": "Agendamento online da Monteiró Barbearia",
-  "start_url": "./index.html",
-  "scope": "./",
+  "name": "Monteiro Barbearia · Agendamento Online",
+  "short_name": "Monteiro",
+  "start_url": "./",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
   "icons": [
