@@ -221,17 +221,11 @@
     content:''; position:absolute; inset:0 0 auto 0; height:3px;
     background:var(--plan-accent, var(--red));
   }
-  .plan-card-top{display:flex; align-items:center; gap:12px; margin-bottom:16px;}
-  .plan-medal{
-    width:44px; height:44px; border-radius:50%; flex:none;
-    border:2px dashed var(--plan-accent, var(--red));
-    display:flex; align-items:center; justify-content:center;
-    font-family:'Playfair Display',serif; font-weight:700; font-size:1.05rem;
-    color:var(--plan-accent, var(--red));
-  }
-  .plan-heading{display:flex; flex-direction:column; gap:3px; min-width:0;}
-  .plan-name{font-family:'Playfair Display',serif; font-size:1.2rem; font-weight:600; color:var(--cream); letter-spacing:.02em;}
-  .plan-price{font-family:'Playfair Display',serif; font-size:1.05rem; color:var(--plan-accent, var(--red-bright)); font-weight:600;}
+  .plan-card-top{display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:16px;}
+  .plan-badge-img{width:100%; max-width:200px; aspect-ratio:698/512; object-fit:contain; display:block; filter:drop-shadow(0 6px 14px rgba(0,0,0,.5));}
+  .plan-heading{display:flex; align-items:baseline; justify-content:space-between; width:100%; gap:10px;}
+  .plan-name{font-family:'Playfair Display',serif; font-size:1.05rem; font-weight:600; color:var(--cream); letter-spacing:.02em;}
+  .plan-price{font-family:'Playfair Display',serif; font-size:1.15rem; color:var(--plan-accent, var(--red-bright)); font-weight:600; white-space:nowrap;}
   .plan-price small{font-family:'Jost',sans-serif; font-size:.66rem; color:var(--muted); font-weight:400;}
   .plan-checklist{list-style:none; display:flex; flex-direction:column; gap:8px; margin-bottom:14px;}
   .plan-checklist li{display:flex; align-items:center; gap:9px; font-size:.85rem; color:var(--cream);}
@@ -1785,9 +1779,9 @@ function setCategory(c){ state.activeCategory = c; renderCategoryChips(); render
 // serviços avulsos. Pedido feito pelo WhatsApp da barbearia até existir um fluxo
 // de assinatura de verdade no app.
 const SERVICE_PLANS = [
-  { id:'bronze',   name:'Bronze',   price:110, accent:'var(--plan-bronze)',   accentDim:'rgba(201,138,82,.25)',  services:['4x Corte'] },
-  { id:'gold',     name:'Gold',     price:140, accent:'var(--plan-gold)',     accentDim:'rgba(232,184,76,.25)',  services:['4x Corte','4x Sobrancelha'] },
-  { id:'platinum', name:'Platinum', price:220, accent:'var(--plan-platinum)', accentDim:'rgba(207,214,218,.25)', services:['4x Corte','4x Barba','4x Sobrancelha'] },
+  { id:'bronze',   name:'Bronze',   price:110, img:'plan-bronze.png',   accent:'var(--plan-bronze)',   accentDim:'rgba(201,138,82,.25)',  services:['4x Corte'] },
+  { id:'gold',     name:'Gold',     price:140, img:'plan-gold.png',     accent:'var(--plan-gold)',     accentDim:'rgba(232,184,76,.25)',  services:['4x Corte','4x Sobrancelha'] },
+  { id:'platinum', name:'Platinum', price:220, img:'plan-platinum.png', accent:'var(--plan-platinum)', accentDim:'rgba(207,214,218,.25)', services:['4x Corte','4x Barba','4x Sobrancelha'] },
 ];
 function renderServicePlans(){
   const wrap = document.getElementById('plansRow');
@@ -1795,7 +1789,7 @@ function renderServicePlans(){
   wrap.innerHTML = SERVICE_PLANS.map(p => `
     <div class="plan-card" style="--plan-accent:${p.accent}; --plan-accent-dim:${p.accentDim};">
       <div class="plan-card-top">
-        <div class="plan-medal">${p.name[0]}</div>
+        <img class="plan-badge-img" src="${p.img}" alt="Selo do plano ${p.name}" loading="lazy">
         <div class="plan-heading">
           <span class="plan-name">${p.name}</span>
           <span class="plan-price">R$ ${p.price}<small> /mês</small></span>
