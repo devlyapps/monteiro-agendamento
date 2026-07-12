@@ -937,6 +937,52 @@
     </div>
   </section>
 
+  <!-- ============ AGENDAMENTO DE PLANO (4 semanas) ============ -->
+  <section class="screen" id="screen-plan-booking">
+    <div class="topbar">
+      <button class="icon-btn" onclick="showScreen('screen-home')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h2 class="display">Agendar plano</h2>
+    </div>
+
+    <div class="summary-chip">
+      <div><strong id="planBkTitle">—</strong><p id="planBkSub">—</p></div>
+    </div>
+
+    <p style="padding:0 22px 6px; font-size:.78rem; color:var(--muted); line-height:1.5;">
+      Escolha o profissional e um dia (Terça a Sexta). O mesmo dia e horário será reservado <strong>toda semana, por 4 semanas seguidas</strong>.
+    </p>
+
+    <div class="section-label"><span>Profissional</span><div class="line"></div></div>
+    <div class="prof-row" id="planProfRow"></div>
+
+    <div class="section-label"><span>Dia da semana</span><div class="line"></div></div>
+    <div class="cal-wrap" style="margin:0 22px 4px;" id="planCalWrap">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="planCalPrev()">‹</button>
+        <span id="planCalMonthLabel" class="cal-month-label"></span>
+        <button class="cal-nav" onclick="planCalNext()">›</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+      </div>
+      <div class="cal-grid" id="planCalGrid"></div>
+    </div>
+
+    <div class="section-label"><span>Horário</span><div class="line"></div></div>
+    <div id="planSlotWrap"></div>
+
+    <div id="planDatesPreview" style="padding:0 22px; margin-top:8px;"></div>
+
+    <div style="height:90px;"></div>
+
+    <div class="sticky-bar">
+      <div class="total"><span>Plano</span><strong id="planBkTotal">4 semanas</strong></div>
+      <button class="btn btn-green" id="planConfirmBtn" disabled onclick="confirmPlanBooking()">Confirmar plano</button>
+    </div>
+  </section>
+
   <!-- ============ APPOINTMENTS ============ -->
   <section class="screen" id="screen-appointments">
     <div class="topbar">
@@ -1778,10 +1824,13 @@ function setCategory(c){ state.activeCategory = c; renderCategoryChips(); render
 // Conteúdo fixo (não vem do backend) — pacotes recorrentes vendidos à parte dos
 // serviços avulsos. Pedido feito pelo WhatsApp da barbearia até existir um fluxo
 // de assinatura de verdade no app.
+// comboServiceName precisa bater exatamente com o nome de um serviço cadastrado
+// pelo admin na aba Serviços (duração = soma dos serviços do combo, preço R$0
+// porque já foi pago à vista no Pix ao contratar o plano).
 const SERVICE_PLANS = [
-  { id:'bronze',   name:'Bronze',   price:110, img:'plan-bronze.png',   accent:'var(--plan-bronze)',   accentDim:'rgba(201,138,82,.25)',  services:['4x Corte'] },
-  { id:'gold',     name:'Gold',     price:140, img:'plan-gold.png',     accent:'var(--plan-gold)',     accentDim:'rgba(232,184,76,.25)',  services:['4x Corte','4x Sobrancelha'] },
-  { id:'platinum', name:'Platinum', price:220, img:'plan-platinum.png', accent:'var(--plan-platinum)', accentDim:'rgba(207,214,218,.25)', services:['4x Corte','4x Barba','4x Sobrancelha'] },
+  { id:'bronze',   name:'Bronze',   price:110, img:'plan-bronze.png',   accent:'var(--plan-bronze)',   accentDim:'rgba(201,138,82,.25)',  services:['4x Corte'],                          comboServiceName:'Combo Bronze' },
+  { id:'gold',     name:'Gold',     price:140, img:'plan-gold.png',     accent:'var(--plan-gold)',     accentDim:'rgba(232,184,76,.25)',  services:['4x Corte','4x Sobrancelha'],         comboServiceName:'Combo Gold' },
+  { id:'platinum', name:'Platinum', price:220, img:'plan-platinum.png', accent:'var(--plan-platinum)', accentDim:'rgba(207,214,218,.25)', services:['4x Corte','4x Barba','4x Sobrancelha'], comboServiceName:'Combo Platinum' },
 ];
 function renderServicePlans(){
   const wrap = document.getElementById('plansRow');
@@ -1800,13 +1849,9 @@ function renderServicePlans(){
       </ul>
       <p class="plan-freq">Podendo cortar 1x por semana (4x no mês) · Terça a Sexta</p>
       <div class="plan-warning">⚠️ Marcou e não veio, perde o dia da semana.</div>
-      <button class="plan-cta" onclick="contactAboutPlan('${p.name}', ${p.price})">Quero esse plano</button>
+      <button class="plan-cta" onclick="openPlanPixModal('${p.id}')">Quero esse plano</button>
     </div>
   `).join('');
-}
-function contactAboutPlan(name, price){
-  const msg = encodeURIComponent(`Ola! Tenho interesse no plano ${name} (R$ ${price}/mes) da Barbearia Monteiro. Pode me passar mais detalhes?`);
-  window.open(`https://wa.me/5519994800891?text=${msg}`, '_blank');
 }
 
 function renderServices(){
@@ -2240,12 +2285,40 @@ function openPixModal(){
 function closePixModal(){
   const modal = document.getElementById('pixModal');
   if(modal){ modal.style.display = 'none'; document.body.style.overflow = ''; }
+  pendingPlan = null; // se o cliente fechar sem confirmar, não deixa "vazar" pro próximo pagamento
 }
 function copyPixCode(){
   const code = '00020101021126330014br.gov.bcb.pix0111422780858835204000053039865802BR5919DENIS M DA S DANTAS6011HORTOLANDIA62070503***6304400B';
   navigator.clipboard.writeText(code).then(() => toast('Código Pix copiado!')).catch(() => toast('Copie manualmente o código'));
 }
+
+// Plano mensal pendente de pagamento (preenchido por openPlanPixModal). O modal de
+// Pix é o mesmo usado pra pagar um serviço avulso — o QR/código é o mesmo em
+// qualquer valor (o cliente digita o valor na hora de pagar), só o texto muda.
+let pendingPlan = null;
+function openPlanPixModal(planId){
+  const plan = SERVICE_PLANS.find(p => p.id === planId);
+  if(!plan) return;
+  pendingPlan = plan;
+  const modal = document.getElementById('pixModal');
+  if(!modal) return;
+  document.getElementById('pixAmount').textContent = `R$ ${plan.price}`;
+  document.getElementById('pixAmountInline').textContent = `R$ ${plan.price}`;
+  document.getElementById('pixServiceName').textContent = `Plano ${plan.name} (mensal)`;
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
 function sendPixComprovante(){
+  if(pendingPlan){
+    const plan = pendingPlan;
+    pendingPlan = null;
+    const msg = encodeURIComponent(`Ola! Acabei de pagar o Pix referente ao Plano ${plan.name} (R$ ${plan.price}/mes) da Barbearia Monteiro. Segue o comprovante em anexo.`);
+    window.open(`https://wa.me/5519994800891?text=${msg}`, '_blank');
+    closePixModal();
+    openPlanBookingScreen(plan);
+    return;
+  }
   const price   = state.selectedService ? state.selectedService.price : '?';
   const service = state.selectedService ? state.selectedService.name : 'serviço';
   const profName = state.selectedProf ? (professionals.find(p=>p.id===state.selectedProf)?.name || '') : '';
@@ -2255,6 +2328,197 @@ function sendPixComprovante(){
   window.open(`https://wa.me/5519994800891?text=${msg}`, '_blank');
   closePixModal();
 }
+
+/* ===================== AGENDAMENTO DE PLANO (4 semanas) ===================== */
+let planBookingState = { plan:null, comboService:null, profId:null, date:null, slot:null };
+let planCalYear  = new Date().getFullYear();
+let planCalMonth = new Date().getMonth();
+
+function openPlanBookingScreen(plan){
+  const comboService = services.find(s => s.name === plan.comboServiceName);
+  if(!comboService){
+    toast('Esse plano ainda não está configurado no sistema. Fale com a barbearia pelo WhatsApp pra concluir.');
+    return;
+  }
+  planBookingState = { plan, comboService, profId:null, date:null, slot:null };
+  planCalYear  = new Date().getFullYear();
+  planCalMonth = new Date().getMonth();
+
+  document.getElementById('planBkTitle').textContent = `Plano ${plan.name}`;
+  document.getElementById('planBkSub').textContent = `${comboService.name} · ${comboService.duration} min · 1x por semana, 4 semanas`;
+  document.getElementById('planDatesPreview').innerHTML = '';
+
+  renderPlanProfessionals();
+  renderPlanCal();
+  renderPlanSlots();
+  updatePlanConfirmBtn();
+  showScreen('screen-plan-booking');
+}
+
+function renderPlanProfessionals(){
+  const wrap = document.getElementById('planProfRow');
+  const eligible = professionals.filter(p => Array.isArray(p.serviceIds) && p.serviceIds.map(Number).includes(Number(planBookingState.comboService.id)));
+  if(!eligible.length){
+    wrap.innerHTML = `<div class="empty-note">Nenhum colaborador disponível pra esse plano no momento.</div>`;
+    return;
+  }
+  wrap.innerHTML = eligible.map(p => `
+    <div class="prof-card ${p.id===planBookingState.profId?'active':''}" onclick="selectPlanProf(${p.id})">
+      <div class="prof-avatar" style="background:linear-gradient(135deg, ${p.c1}, ${p.c2});">${p.initials}</div>
+      <span>${p.name}</span>
+      <small>${p.role}</small>
+    </div>
+  `).join('');
+}
+function selectPlanProf(id){
+  planBookingState.profId = id;
+  planBookingState.slot = null;
+  renderPlanProfessionals();
+  renderPlanSlots();
+  updatePlanConfirmBtn();
+}
+
+function planCalPrev(){
+  planCalMonth--;
+  if(planCalMonth < 0){ planCalMonth = 11; planCalYear--; }
+  renderPlanCal();
+}
+function planCalNext(){
+  planCalMonth++;
+  if(planCalMonth > 11){ planCalMonth = 0; planCalYear++; }
+  renderPlanCal();
+}
+function renderPlanCal(){
+  const label = document.getElementById('planCalMonthLabel');
+  const grid  = document.getElementById('planCalGrid');
+  if(!label || !grid) return;
+  label.textContent = `${monthNames[planCalMonth]} ${planCalYear}`;
+
+  const today   = isoOffset(0);
+  const maxDays = Number(businessConfig.bookingWindow) || 30;
+  const maxDate = isoOffset(maxDays);
+
+  const firstDay    = new Date(planCalYear, planCalMonth, 1).getDay();
+  const daysInMonth = new Date(planCalYear, planCalMonth + 1, 0).getDate();
+
+  let html = '';
+  for(let i = firstDay - 1; i >= 0; i--){
+    html += `<div class="cal-day other-month"></div>`;
+  }
+  for(let d = 1; d <= daysInMonth; d++){
+    const iso = `${planCalYear}-${String(planCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(iso+'T00:00').getDay();
+    const cfg = businessConfig.hours[dow];
+    const isClosed   = !cfg || cfg.closed;
+    const isBlocked  = isDateBlocked(iso);
+    const isPast     = iso < today;
+    const isFuture   = iso > maxDate;
+    const isWrongDow = dow < 2 || dow > 5; // regra do plano: só Terça(2) a Sexta(5)
+    const isSelected = iso === planBookingState.date;
+    const isToday    = iso === today;
+    const disabled   = isClosed || isBlocked || isPast || isFuture || isWrongDow;
+    let cls = 'cal-day';
+    if(isSelected) cls += ' selected';
+    else if(isToday) cls += ' today';
+    if(disabled) cls += ' closed';
+    html += `<div class="${cls}" onclick="${disabled?'':`selectPlanDay('${iso}')`}">${d}</div>`;
+  }
+  const total = firstDay + daysInMonth;
+  const rem = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for(let d = 1; d <= rem; d++){
+    html += `<div class="cal-day other-month"></div>`;
+  }
+  grid.innerHTML = html;
+}
+function selectPlanDay(iso){
+  planBookingState.date = iso;
+  planBookingState.slot = null;
+  renderPlanCal();
+  renderPlanSlots();
+  updatePlanConfirmBtn();
+  renderPlanDatesPreview();
+}
+
+function renderPlanSlots(){
+  const wrap = document.getElementById('planSlotWrap');
+  if(!planBookingState.profId || !planBookingState.date){
+    wrap.innerHTML = `<div class="empty-note">Escolha o profissional e o dia primeiro.</div>`;
+    return;
+  }
+  // generateSlots lê state.selectedService pra saber a duração — troca temporariamente
+  // pelo combo do plano (seguro: o fluxo normal de agendamento sempre redefine
+  // state.selectedService do zero antes de usar, então não sobra "lixo" aqui).
+  const prevService = state.selectedService;
+  state.selectedService = planBookingState.comboService;
+  const slots = generateSlots(planBookingState.date, planBookingState.profId);
+  state.selectedService = prevService;
+
+  if(!slots.length){
+    wrap.innerHTML = `<div class="empty-note">Fechado nesse dia. Escolha outro.</div>`;
+    return;
+  }
+  wrap.innerHTML = `<div class="slot-grid">${slots.map(s => `
+    <div class="slot ${s.time===planBookingState.slot?'active':''} ${!s.available?'taken':''}"
+         onclick="${s.available?`selectPlanSlot('${s.time}')`:''}">${s.time}</div>
+  `).join('')}</div>`;
+}
+function selectPlanSlot(time){
+  planBookingState.slot = time;
+  renderPlanSlots();
+  updatePlanConfirmBtn();
+  renderPlanDatesPreview();
+}
+function renderPlanDatesPreview(){
+  const el = document.getElementById('planDatesPreview');
+  if(!el) return;
+  if(!planBookingState.date || !planBookingState.slot){ el.innerHTML = ''; return; }
+  const start = new Date(planBookingState.date+'T00:00');
+  const dates = [];
+  for(let i = 0; i < 4; i++){
+    const d = new Date(start);
+    d.setDate(d.getDate() + i*7);
+    dates.push(`${weekdayLabel[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  el.innerHTML = `
+    <div style="font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px;">Suas 4 datas</div>
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      ${dates.map((d,i) => `<div style="display:flex; justify-content:space-between; font-size:.85rem; color:var(--cream); background:var(--surface); border:1px solid var(--red-dim); border-radius:10px; padding:9px 12px;"><span>Semana ${i+1}</span><strong>${d} · ${planBookingState.slot}</strong></div>`).join('')}
+    </div>
+  `;
+}
+function updatePlanConfirmBtn(){
+  document.getElementById('planConfirmBtn').disabled = !planBookingState.profId || !planBookingState.date || !planBookingState.slot;
+}
+
+async function confirmPlanBooking(){
+  const btn = document.getElementById('planConfirmBtn');
+  if(btn.disabled) return;
+  btn.disabled = true;
+  const { plan, comboService, profId, date, slot } = planBookingState;
+  toast('Agendando suas 4 semanas...');
+  const res = await apiPost('addPlanBooking', {
+    serviceId: comboService.id,
+    profId: profId,
+    startDate: date,
+    time: slot,
+    clientName: state.userName || 'Cliente',
+    clientPhone: state.userPhone || '',
+    payment: `Plano ${plan.name}`,
+    planName: plan.name
+  });
+  if(res.error){
+    toast(res.error);
+    updatePlanConfirmBtn();
+    return;
+  }
+  (res.dates || []).forEach((d, i) => {
+    bookings.push({ id: res.ids[i], serviceId: comboService.id, profId, date: d, time: slot, clientName: state.userName, clientPhone: state.userPhone, payment: `Plano ${plan.name}` });
+  });
+  toast(`✅ Plano ${plan.name} agendado! 4 semanas confirmadas.`, 4000);
+  showScreen('screen-appointments'); setNav('appointments');
+  renderAppointments();
+}
+
 async function validateClientVisit(phone, serviceName, date, bookingId){
   if(!phone){ toast('Este agendamento não tem telefone cadastrado'); return; }
   if(validatedBookingIds.has(String(bookingId))){ toast('Esta visita já foi validada'); return; }
