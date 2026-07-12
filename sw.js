@@ -1,28 +1,21 @@
-// Service worker — instalação do app (sem cache offline) + lembretes via push (Firebase Cloud Messaging).
+// Service worker — instalação do app (sem cache offline) + lembretes via push.
+//
+// Escuta o evento "push" nativo direto (sem importar o SDK do Firebase aqui).
+// O SDK só é necessário na página principal, pra gerar o token (getToken). Usar o
+// SDK aqui dentro causava notificação duplicada/genérica em alguns navegadores
+// (ele registra um listener de push interno, que competia com o nosso).
 
-importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
-
-firebase.initializeApp({
-  apiKey: "AIzaSyArsioR3GA87ILUM8AhyNpKwvd40qV1-0U",
-  authDomain: "monteiro-barbearia-bc806.firebaseapp.com",
-  projectId: "monteiro-barbearia-bc806",
-  storageBucket: "monteiro-barbearia-bc806.firebasestorage.app",
-  messagingSenderId: "718127553031",
-  appId: "1:718127553031:web:4525aaddbbfa16aecce8a2"
-});
-
-const messaging = firebase.messaging();
-
-// Mostra a notificação quando o app está fechado ou em segundo plano
-messaging.onBackgroundMessage((payload) => {
-  const title = (payload.data && payload.data.title) || 'Barbearia Monteiro';
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch (e) {}
+  const data = payload.data || payload;
+  const title = data.title || 'Barbearia Monteiro';
   const options = {
-    body: (payload.data && payload.data.body) || '',
+    body: data.body || '',
     icon: 'icon-192.png',
     badge: 'icon-192.png'
   };
-  self.registration.showNotification(title, options);
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('install', () => {
