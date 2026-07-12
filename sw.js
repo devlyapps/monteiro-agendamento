@@ -16,9 +16,9 @@ const messaging = firebase.messaging();
 
 // Mostra a notificação quando o app está fechado ou em segundo plano
 messaging.onBackgroundMessage((payload) => {
-  const title = (payload.notification && payload.notification.title) || 'Monteiró Barbearia';
+  const title = (payload.data && payload.data.title) || 'Barbearia Monteiro';
   const options = {
-    body: (payload.notification && payload.notification.body) || '',
+    body: (payload.data && payload.data.body) || '',
     icon: 'icon-192.png',
     badge: 'icon-192.png'
   };
