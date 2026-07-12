@@ -33,6 +33,9 @@
     --green-bright:#6fe3a0;
     --green-dim:rgba(63,174,102,.22);
     --ok:#6fa57a;
+    --plan-bronze:#c98a52;
+    --plan-gold:#e8b84c;
+    --plan-platinum:#cfd6da;
     --radius:16px;
     --radius-sm:10px;
     font-size:16px;
@@ -203,6 +206,48 @@
     text-transform:uppercase; color:var(--red);
   }
   .section-label .line{flex:1; height:1px; background:var(--red-dim);}
+
+  /* ---------- planos mensais ---------- */
+  .plans-row{display:flex; gap:14px; overflow-x:auto; padding:4px 22px 20px; scrollbar-width:none; scroll-snap-type:x proximity;}
+  .plans-row::-webkit-scrollbar{display:none;}
+  .plan-card{
+    flex:none; width:81%; scroll-snap-align:start;
+    background:linear-gradient(165deg, var(--surface) 0%, #100d0c 100%);
+    border:1px solid var(--plan-accent-dim, var(--red-dim));
+    border-radius:var(--radius); padding:20px 18px 18px;
+    position:relative; overflow:hidden;
+  }
+  .plan-card::before{
+    content:''; position:absolute; inset:0 0 auto 0; height:3px;
+    background:var(--plan-accent, var(--red));
+  }
+  .plan-card-top{display:flex; align-items:center; gap:12px; margin-bottom:16px;}
+  .plan-medal{
+    width:44px; height:44px; border-radius:50%; flex:none;
+    border:2px dashed var(--plan-accent, var(--red));
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Playfair Display',serif; font-weight:700; font-size:1.05rem;
+    color:var(--plan-accent, var(--red));
+  }
+  .plan-heading{display:flex; flex-direction:column; gap:3px; min-width:0;}
+  .plan-name{font-family:'Playfair Display',serif; font-size:1.2rem; font-weight:600; color:var(--cream); letter-spacing:.02em;}
+  .plan-price{font-family:'Playfair Display',serif; font-size:1.05rem; color:var(--plan-accent, var(--red-bright)); font-weight:600;}
+  .plan-price small{font-family:'Jost',sans-serif; font-size:.66rem; color:var(--muted); font-weight:400;}
+  .plan-checklist{list-style:none; display:flex; flex-direction:column; gap:8px; margin-bottom:14px;}
+  .plan-checklist li{display:flex; align-items:center; gap:9px; font-size:.85rem; color:var(--cream);}
+  .plan-checklist svg{width:15px; height:15px; flex:none; color:var(--plan-accent, var(--red-bright));}
+  .plan-freq{font-size:.72rem; color:var(--muted); margin-bottom:12px; line-height:1.5;}
+  .plan-warning{
+    display:flex; align-items:flex-start; gap:6px;
+    font-size:.68rem; color:var(--red-bright); background:var(--red-dim);
+    border:1px solid rgba(196,60,45,.3); border-radius:8px; padding:8px 10px;
+    margin-bottom:14px; line-height:1.4;
+  }
+  .plan-cta{
+    width:100%; padding:12px; border-radius:999px; border:none; cursor:pointer;
+    background:var(--plan-accent, var(--red-bright)); color:#1a1208; font-weight:600; font-size:.86rem;
+    font-family:'Jost',sans-serif;
+  }
 
   .service-list{padding:0 22px; display:flex; flex-direction:column; gap:12px;}
   .service-card{
@@ -820,6 +865,14 @@
     </div>
 
     <div class="chip-row" id="categoryChips"></div>
+
+    <div class="scissor-divider">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="5"/><path d="M8.5 13L6 21l6-3 6 3-2.5-8"/></svg>
+      <span style="font-size:.72rem; letter-spacing:.14em;">PLANOS MENSAIS</span>
+      <div class="line"></div>
+    </div>
+
+    <div class="plans-row" id="plansRow"></div>
 
     <div class="scissor-divider">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8.5 8L20 19M8.5 16L20 5M6 8.5v7"/></svg>
@@ -1726,6 +1779,41 @@ function renderCategoryChips(){
   ).join('');
 }
 function setCategory(c){ state.activeCategory = c; renderCategoryChips(); renderServices(); }
+
+/* ===================== PLANOS MENSAIS ===================== */
+// Conteúdo fixo (não vem do backend) — pacotes recorrentes vendidos à parte dos
+// serviços avulsos. Pedido feito pelo WhatsApp da barbearia até existir um fluxo
+// de assinatura de verdade no app.
+const SERVICE_PLANS = [
+  { id:'bronze',   name:'Bronze',   price:110, accent:'var(--plan-bronze)',   accentDim:'rgba(201,138,82,.25)',  services:['4x Corte'] },
+  { id:'gold',     name:'Gold',     price:140, accent:'var(--plan-gold)',     accentDim:'rgba(232,184,76,.25)',  services:['4x Corte','4x Sobrancelha'] },
+  { id:'platinum', name:'Platinum', price:220, accent:'var(--plan-platinum)', accentDim:'rgba(207,214,218,.25)', services:['4x Corte','4x Barba','4x Sobrancelha'] },
+];
+function renderServicePlans(){
+  const wrap = document.getElementById('plansRow');
+  if(!wrap) return;
+  wrap.innerHTML = SERVICE_PLANS.map(p => `
+    <div class="plan-card" style="--plan-accent:${p.accent}; --plan-accent-dim:${p.accentDim};">
+      <div class="plan-card-top">
+        <div class="plan-medal">${p.name[0]}</div>
+        <div class="plan-heading">
+          <span class="plan-name">${p.name}</span>
+          <span class="plan-price">R$ ${p.price}<small> /mês</small></span>
+        </div>
+      </div>
+      <ul class="plan-checklist">
+        ${p.services.map(s => `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>${s}</li>`).join('')}
+      </ul>
+      <p class="plan-freq">Podendo cortar 1x por semana (4x no mês) · Terça a Sexta</p>
+      <div class="plan-warning">⚠️ Marcou e não veio, perde o dia da semana.</div>
+      <button class="plan-cta" onclick="contactAboutPlan('${p.name}', ${p.price})">Quero esse plano</button>
+    </div>
+  `).join('');
+}
+function contactAboutPlan(name, price){
+  const msg = encodeURIComponent(`Ola! Tenho interesse no plano ${name} (R$ ${price}/mes) da Barbearia Monteiro. Pode me passar mais detalhes?`);
+  window.open(`https://wa.me/5519994800891?text=${msg}`, '_blank');
+}
 
 function renderServices(){
   const term = (document.getElementById('searchInput')?.value || '').toLowerCase();
@@ -3533,6 +3621,7 @@ async function init(){
   renderHeroHours();
   renderCategoryChips();
   renderServices();
+  renderServicePlans();
   renderAppointments();
 
   // Restaura sessão salva (mantém logado após recarregar)
