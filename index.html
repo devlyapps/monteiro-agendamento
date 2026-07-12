@@ -2069,7 +2069,7 @@ function renderAppointments(){
   }).join('');
 }
 async function cancelBooking(id){
-  const res = await apiPost('cancelBooking', { id });
+  const res = await apiPost('cancelBooking', { id, source: 'client' });
   if(res.error){ toast(res.error); return; }
   bookings = bookings.filter(b=>b.id!==id);
   renderAppointments();
@@ -2172,7 +2172,7 @@ async function validateClientVisit(phone, serviceName, date, bookingId){
   toast(msg, total >= 10 ? 5000 : 3000);
 }
 async function adminCancelBooking(id){
-  const res = await apiPost('cancelBooking', { id });
+  const res = await apiPost('cancelBooking', { id, source: 'admin' });
   if(res.error){ toast(res.error); return; }
   bookings = bookings.filter(b=>b.id!==id);
   renderAgendaApptList();
