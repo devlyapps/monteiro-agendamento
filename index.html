@@ -924,6 +924,12 @@
       </div>
     </div>
 
+    <div id="adminReminderBanner" style="display:none; margin-bottom:14px;">
+      <button class="reminder-banner" style="width:100%; border:none;" onclick="enableAdminPushNotifications()">
+        🔔 Ativar notificações de novos agendamentos
+      </button>
+    </div>
+
     <div class="chip-row" id="adminTabs">
       <div class="chip chip-money" data-tab="caixa" onclick="setAdminTab('caixa')">Caixa</div>
       <div class="chip" data-tab="agenda" onclick="setAdminTab('agenda')">Agendas</div>
@@ -1259,6 +1265,8 @@ const FIREBASE_CONFIG = {
   appId: "1:718127553031:web:4525aaddbbfa16aecce8a2"
 };
 const FCM_VAPID_KEY = "BHKj99IKtoyQTnporSLjeTNC-PtzeBhoBt7QdFq2Ql2bgwSzwHfbfZ_Yys5hNUp4HrWnRGGIxw45J62qU15Q2ns";
+// Identificador fixo do admin na aba PUSH_TOKENS (precisa bater com o mesmo valor no backend).
+const ADMIN_PUSH_ID = 'ADMIN_BARBEIRO';
 let fcmMessaging = null;
 
 function initFcm(){
@@ -1277,6 +1285,9 @@ function updateReminderBanner(){
   // Banner na tela Meus Horários — mostra sempre que o token não foi registrado ainda
   const b2 = document.getElementById('reminderApptBanner');
   if(b2) b2.style.display = supported ? 'block' : 'none';
+  // Banner no painel admin — só mostra se ainda não decidiu
+  const b3 = document.getElementById('adminReminderBanner');
+  if(b3) b3.style.display = (supported && Notification.permission === 'default') ? 'block' : 'none';
 }
 
 async function enablePushReminders(){
@@ -1297,6 +1308,29 @@ async function enablePushReminders(){
       const b2 = document.getElementById('reminderApptBanner');
       if(b1) b1.style.display = 'none';
       if(b2) b2.style.display = 'none';
+    } else {
+      toast('Não foi possível obter o token. Tente pelo Safari com o app instalado.');
+    }
+  } catch(e){
+    console.error(e);
+    toast('Erro: ' + e.message);
+  }
+}
+
+async function enableAdminPushNotifications(){
+  if(!fcmMessaging){ toast('Notificações não disponíveis nesse navegador'); return; }
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){ toast('Permissão de notificação não concedida'); return; }
+    toast('Registrando...');
+    const registration = await navigator.serviceWorker.ready;
+    const token = await fcmMessaging.getToken({ vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    if(token){
+      const res = await apiPost('saveFcmToken', { phone: ADMIN_PUSH_ID, token });
+      if(res.error){ toast('Erro ao salvar: ' + res.error); return; }
+      toast('✅ Notificações ativadas! Você será avisado a cada novo agendamento de cliente.');
+      const b = document.getElementById('adminReminderBanner');
+      if(b) b.style.display = 'none';
     } else {
       toast('Não foi possível obter o token. Tente pelo Safari com o app instalado.');
     }
@@ -1639,6 +1673,7 @@ function enterAdmin(){
   showScreen('screen-admin');
   document.getElementById('bottomNav').style.display = 'flex';
   setNav('admin');
+  updateReminderBanner();
   saveSession();
 }
 function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
@@ -1966,6 +2001,9 @@ function updateConfirmBtn(){
 async function confirmBooking(){
   const prof = professionals.find(p=>p.id===state.selectedProf);
   if(!prof){ toast('Selecione um colaborador antes de confirmar'); return; }
+  const btn = document.getElementById('confirmBtn');
+  if(btn.disabled) return; // evita duplo-clique disparar duas reservas
+  btn.disabled = true;
   const payload = {
     serviceId: state.selectedService.id,
     profId: state.selectedProf,
@@ -1973,11 +2011,17 @@ async function confirmBooking(){
     time: state.selectedSlot,
     clientName: state.userName || 'Cliente',
     clientPhone: state.userPhone || '',
-    payment: state.selectedPayment || 'Não informado'
+    payment: state.selectedPayment || 'Não informado',
+    source: 'client'
   };
   toast('Agendando...');
   const res = await apiPost('addBooking', payload);
-  if(res.error){ toast(res.error); return; }
+  if(res.error){
+    toast(res.error);
+    updateConfirmBtn(); // reabilita conforme o estado atual da seleção
+    if(res.error.includes('reservado por outra pessoa')) renderSlots(); // atualiza a grade de horários
+    return;
+  }
   bookings.push({ id: res.id, ...payload });
 
   document.getElementById('successModalDetails').innerHTML = `
@@ -2728,7 +2772,7 @@ function renderDaySlotsForm(time){
         </select>
       </div>
       <div style="display:flex; gap:10px; margin-top:14px;">
-        <button class="btn btn-green" style="flex:1;" onclick="saveDaySlotBooking('${time}')">Agendar</button>
+        <button class="btn btn-green" style="flex:1;" onclick="saveDaySlotBooking('${time}', this)">Agendar</button>
         <button class="btn btn-ghost" style="flex:1;" onclick="cancelDaySlotsForm()">Cancelar</button>
       </div>
     </div>`;
@@ -2742,7 +2786,7 @@ function cancelDaySlotsForm(){
   document.querySelectorAll('.day-slot-row.slot-free').forEach(el => el.style.borderColor = '');
 }
 
-async function saveDaySlotBooking(time){
+async function saveDaySlotBooking(time, btnEl){
   const name      = (document.getElementById('dsName')?.value || '').trim();
   const phone     = (document.getElementById('dsPhone')?.value || '').replace(/\D/g,'');
   const serviceId = Number(document.getElementById('dsService')?.value);
@@ -2750,14 +2794,17 @@ async function saveDaySlotBooking(time){
 
   if(!name){ toast('Digite o nome do cliente'); return; }
   if(!daySlotsDate){ toast('Erro: data não definida'); return; }
+  if(btnEl?.disabled) return; // evita duplo-clique disparar duas reservas
+  if(btnEl) btnEl.disabled = true;
 
   toast('Gravando...');
   const res = await apiPost('addBooking', {
     serviceId, profId: selectedAgendaStaff,
     date: daySlotsDate, time,
-    clientName: name, clientPhone: phone, payment
+    clientName: name, clientPhone: phone, payment,
+    source: 'admin'
   });
-  if(res.error){ toast(res.error); return; }
+  if(res.error){ toast(res.error); if(btnEl) btnEl.disabled = false; return; }
 
   bookings.push({
     id: res.id, serviceId, profId: selectedAgendaStaff,
@@ -2915,7 +2962,7 @@ function openAdminBookingForm(){
       </div>
 
       <div style="display:flex; gap:10px; margin-top:16px;">
-        <button class="btn btn-green" style="flex:1;" onclick="saveAdminBooking()">Gravar agendamento</button>
+        <button class="btn btn-green" style="flex:1;" onclick="saveAdminBooking(this)">Gravar agendamento</button>
         <button class="btn btn-ghost" style="flex:1;" onclick="closeAdminBookingForm()">Cancelar</button>
       </div>
     </div>
@@ -3011,7 +3058,7 @@ function closeAdminBookingForm(){
   wrap.innerHTML = '';
   adminSelectedSlot = null;
 }
-async function saveAdminBooking(){
+async function saveAdminBooking(btnEl){
   const name      = document.getElementById('abfName').value.trim();
   const phone     = document.getElementById('abfPhone').value.replace(/\D/g,'');
   const profId    = Number(document.getElementById('abfProf').value);
@@ -3023,6 +3070,8 @@ async function saveAdminBooking(){
   if(!name){ toast('Digite o nome do cliente'); return; }
   if(!date){ toast('Selecione a data'); return; }
   if(!adminSelectedSlot){ toast('Selecione um horário'); return; }
+  if(btnEl?.disabled) return; // evita duplo-clique disparar duas reservas
+  if(btnEl) btnEl.disabled = true;
 
   // Monta lista de datas: sempre inclui a data principal
   const allDates = [date];
@@ -3049,7 +3098,8 @@ async function saveAdminBooking(){
   for(const d of allDates){
     const res = await apiPost('addBooking', {
       serviceId, profId, date: d, time: adminSelectedSlot,
-      clientName: name, clientPhone: phone, payment
+      clientName: name, clientPhone: phone, payment,
+      source: 'admin'
     });
     if(res.error){ erros++; }
     else {
