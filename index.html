@@ -1574,6 +1574,16 @@ function renderLoyaltyCard(total, visits){
   document.getElementById('loyaltyHistory').innerHTML = buildHistoryHTML(visits);
 }
 
+// Formata um telefone já completo pra exibição. Trata 10 e 11 dígitos (a
+// maioria dos celulares tem 11, mas alguns clientes cadastraram sem o 9º
+// dígito) — sem isso, um número de 10 dígitos ficava com o corte errado.
+function formatPhoneBR(digits){
+  const d = String(digits || '').replace(/\D/g,'');
+  if(d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if(d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return d ? `(${d.slice(0,2)}) ${d.slice(2)}` : '';
+}
+
 /* ===================== AUTH (celular + senha) ===================== */
 function maskPhone(el){
   let d = el.value.replace(/\D/g,'').slice(0,11);
@@ -1601,7 +1611,7 @@ async function doRegister(){
   const digits = document.getElementById('regPhone').value.replace(/\D/g,'');
   const pass = document.getElementById('regPass').value;
   if(!name){ toast('Digite seu nome'); return; }
-  if(digits.length < 10){ toast('Digite um celular válido com DDD'); return; }
+  if(digits.length !== 11){ toast('Digite um celular válido com DDD e 9 dígitos'); return; }
   if(!pass || pass.length < 4){ toast('A senha precisa de ao menos 4 caracteres'); return; }
   toast('Criando conta...');
   const res = await apiPost('register', { name, phone: digits, password: pass });
@@ -2623,7 +2633,7 @@ function renderAgendaApptList(){
     const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Barbearia Monteiro. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dayLabel}, dia ${dayNum}, as ${timeStr}. Aguardamos voce!`);
     const waLink = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
     const payLabel = b.payment || '';
-    const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '';
+    const phoneFormatted = formatPhoneBR(phone);
     return `
       <div class="appt-card">
         <div class="appt-card-top">
@@ -2904,7 +2914,7 @@ function openAdminBookingForm(){
     <div class="admin-inline-form" style="margin:0;">
       <h3 style="font-size:.92rem; margin-bottom:14px;">Novo agendamento</h3>
       <div class="field"><label>Nome do cliente</label><input id="abfName" type="text" placeholder="Nome completo"></div>
-      <div class="field"><label>Telefone (opcional)</label><input id="abfPhone" type="tel" placeholder="(11) 99999-9999"></div>
+      <div class="field"><label>Telefone (opcional)</label><input id="abfPhone" type="tel" placeholder="(11) 99999-9999" oninput="maskPhone(this)"></div>
       <div class="field">
         <label>Colaborador</label>
         <select id="abfProf" onchange="renderAdminBookingSlots()">
@@ -3128,7 +3138,7 @@ let loyaltyModalCurrentPhone = '';
 async function openLoyaltyModal(name, phone, loyaltyCount){
   loyaltyModalCurrentPhone = phone;
   document.getElementById('loyaltyModalName').textContent = name || 'Cliente';
-  const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '';
+  const phoneFormatted = formatPhoneBR(phone);
   document.getElementById('loyaltyModalPhone').textContent = phoneFormatted;
   document.getElementById('loyaltyModalBody').innerHTML = `<div style="padding:24px; text-align:center; color:var(--muted); font-size:.85rem;">Carregando fidelidade...</div>`;
   document.getElementById('loyaltyModalOverlay').classList.add('show');
@@ -3253,7 +3263,7 @@ async function renderClientesTab(){
       : 'Sem visitas';
 
     const phone = String(c.phone||'').replace(/\D/g,'');
-    const phoneFormatted = phone ? `(${phone.slice(0,2)}) ${phone.slice(2,7)}-${phone.slice(7)}` : '—';
+    const phoneFormatted = formatPhoneBR(phone) || '—';
     const loyalty = c.loyaltyCount || 0;
     const loyaltyNext = loyalty >= 10 ? '🎉 Grátis!' : loyalty >= 5 ? `${10-loyalty} p/ grátis` : `${5-loyalty} p/ 10% OFF`;
 
