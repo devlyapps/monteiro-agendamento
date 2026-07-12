@@ -1087,7 +1087,8 @@
 
     <!-- TAB: CAIXA -->
     <div class="admin-tab" id="adminTab-caixa" style="display:none;">
-      <div class="admin-block"><h3>Caixa · Serviços do dia</h3></div>
+      <div class="admin-block"><h3>Caixa · Serviços finalizados</h3></div>
+      <p style="padding:0 22px 10px; font-size:.8rem; color:var(--muted);">Só entram aqui os agendamentos que foram <strong>validados</strong> pelo barbeiro (o mesmo botão de validar visita da Agenda) — é o que conta como serviço concluído e pago.</p>
 
       <!-- Calendário da Caixa -->
       <div class="cal-wrap">
@@ -1104,17 +1105,26 @@
       </div>
 
       <div class="admin-day" style="margin-top:14px;">
+        <div class="admin-times">
+          <div class="field"><label>Data de início</label><input id="caixaFrom" type="date" onchange="updateCaixaRange()"></div>
+          <div class="field"><label>Data de fim</label><input id="caixaTo" type="date" onchange="updateCaixaRange()"></div>
+        </div>
+      </div>
+
+      <div class="admin-day">
         <div class="field" style="margin-bottom:0;">
           <label>Colaborador</label>
           <select id="caixaProfFilter" onchange="renderCaixaList()"></select>
         </div>
       </div>
 
-      <div class="section-label" style="margin-top:18px;"><span id="caixaCount">Serviços do dia:</span><div class="line"></div></div>
+      <div class="section-label" style="margin-top:18px;"><span id="caixaCount">Serviços do período:</span><div class="line"></div></div>
       <div class="service-list" id="caixaList"></div>
 
+      <div id="caixaByPayment" style="padding:0 22px; margin-top:10px;"></div>
+
       <div class="summary-chip" style="margin-top:6px;">
-        <div><strong>Total no período</strong><p>Soma dos serviços filtrados</p></div>
+        <div><strong>Total no período</strong><p>Soma dos serviços validados no filtro</p></div>
         <b id="caixaTotal">R$ 0</b>
       </div>
     </div>
@@ -1456,7 +1466,6 @@ function showScreen(id){
   document.getElementById(id).classList.add('active');
   document.getElementById('bottomNav').style.display =
     ['screen-login','screen-admin-login','screen-register'].includes(id) ? 'none' : 'flex';
-  if(id === 'screen-admin'){ document.getElementById('bottomNav').style.display='none'; }
   window.scrollTo(0,0);
 }
 function setNav(which){
@@ -1678,6 +1687,8 @@ function enterAdmin(){
   clientesCache = [];
   document.getElementById('navAdmin').style.display = 'flex';
   document.getElementById('navProfile').style.display = 'none';
+  document.getElementById('navHome').style.display = 'none';
+  document.getElementById('navAppt').style.display = 'none';
   renderAdminDays();
   setAdminTab('hours');
   showScreen('screen-admin');
@@ -1692,6 +1703,8 @@ function logoutUser(){
   state.selectedService = null; state.selectedProf = null; state.selectedDate = null; state.selectedSlot = null;
   document.getElementById('navAdmin').style.display = 'none';
   document.getElementById('navProfile').style.display = 'flex';
+  document.getElementById('navHome').style.display = 'flex';
+  document.getElementById('navAppt').style.display = 'flex';
   clearSession();
   showScreen('screen-login');
   toast('Você saiu da conta');
@@ -2298,6 +2311,13 @@ function setAdminTab(tab){
   if(tab === 'clients'){ renderClientesTab(); }
 }
 
+// Chamado ao clicar no nome do cliente num agendamento (na Agenda) — leva pra
+// aba Clientes e já abre o cartão fidelidade/histórico daquele cliente.
+function goToClientLoyalty(name, phone){
+  setAdminTab('clients');
+  openLoyaltyModal(name, phone, 0);
+}
+
 /* ===================== ADMIN · COLABORADORES ===================== */
 function renderStaffList(){
   const wrap = document.getElementById('staffList');
@@ -2634,12 +2654,13 @@ function renderAgendaApptList(){
     const waLink = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
     const payLabel = b.payment || '';
     const phoneFormatted = formatPhoneBR(phone);
+    const clientNameSafe = (b.clientName || 'Cliente').replace(/'/g, "\\'");
     return `
       <div class="appt-card">
         <div class="appt-card-top">
           <div class="appt-date"><span>${dayLabel}</span><strong>${dayNum}</strong></div>
           <div class="appt-info">
-            <h3>${b.clientName || 'Cliente'}</h3>
+            <h3 ${phone ? `onclick="goToClientLoyalty('${clientNameSafe}','${phone}')" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px;"` : ''}>${b.clientName || 'Cliente'}</h3>
             ${phoneFormatted ? `<a href="tel:+55${phone}" class="appt-phone">${phoneFormatted}</a>` : ''}
             <p>${s ? s.name : 'Servico'} · ${timeStr}</p>
             ${payLabel ? `<p style="color:var(--green-bright); font-size:.8rem; margin-top:2px;">💳 ${payLabel}</p>` : ''}
@@ -3323,7 +3344,8 @@ async function deleteClient(name, phone){
 /* ===================== ADMIN · CAIXA ===================== */
 let caixaCalYear  = new Date().getFullYear();
 let caixaCalMonth = new Date().getMonth();
-let caixaSelectedDate = isoOffset(0);
+let caixaRangeFrom = isoOffset(0);
+let caixaRangeTo   = isoOffset(0);
 
 function caixaCalPrev(){
   caixaCalMonth--;
@@ -3338,12 +3360,34 @@ function caixaCalNext(){
 function caixaCalToday(){
   caixaCalYear  = new Date().getFullYear();
   caixaCalMonth = new Date().getMonth();
-  caixaSelectedDate = isoOffset(0);
+  caixaRangeFrom = isoOffset(0);
+  caixaRangeTo   = isoOffset(0);
+  syncCaixaRangeInputs();
   renderCaixaCal();
   renderCaixaList();
 }
+// Clique no calendário = atalho pra filtrar só aquele dia (define início e fim iguais).
+// Pra um período maior, o admin usa os dois campos de data abaixo do calendário.
 function caixaCalSelectDay(iso){
-  caixaSelectedDate = iso;
+  caixaRangeFrom = iso;
+  caixaRangeTo   = iso;
+  syncCaixaRangeInputs();
+  renderCaixaCal();
+  renderCaixaList();
+}
+function syncCaixaRangeInputs(){
+  const fromEl = document.getElementById('caixaFrom');
+  const toEl   = document.getElementById('caixaTo');
+  if(fromEl) fromEl.value = caixaRangeFrom;
+  if(toEl)   toEl.value   = caixaRangeTo;
+}
+function updateCaixaRange(){
+  const fromEl = document.getElementById('caixaFrom');
+  const toEl   = document.getElementById('caixaTo');
+  if(!fromEl.value || !toEl.value) return;
+  caixaRangeFrom = fromEl.value;
+  caixaRangeTo   = toEl.value;
+  if(caixaRangeFrom > caixaRangeTo){ [caixaRangeFrom, caixaRangeTo] = [caixaRangeTo, caixaRangeFrom]; syncCaixaRangeInputs(); }
   renderCaixaCal();
   renderCaixaList();
 }
@@ -3366,12 +3410,13 @@ function renderCaixaCal(){
   for(let d = 1; d <= daysInMonth; d++){
     const iso       = `${caixaCalYear}-${String(caixaCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isToday   = iso === today;
-    const isSel     = iso === caixaSelectedDate;
+    // Destaca o período inteiro selecionado no calendário, não só um dia.
+    const isInRange = caixaRangeFrom && caixaRangeTo && iso >= caixaRangeFrom && iso <= caixaRangeTo;
     const hasBk     = bookedDays.has(iso);
     let cls = 'cal-day';
-    if(isSel) cls += ' selected';
+    if(isInRange) cls += ' selected';
     else if(isToday) cls += ' today';
-    if(hasBk && !isSel) cls += ' has-booking';
+    if(hasBk && !isInRange) cls += ' has-booking';
     html += `<div class="${cls}" onclick="caixaCalSelectDay('${iso}')">${d}</div>`;
   }
   const total = firstDay + daysInMonth;
@@ -3387,28 +3432,34 @@ function renderCaixaTab(){
     professionals.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
   caixaCalYear  = new Date().getFullYear();
   caixaCalMonth = new Date().getMonth();
-  caixaSelectedDate = isoOffset(0);
+  caixaRangeFrom = isoOffset(0);
+  caixaRangeTo   = isoOffset(0);
+  syncCaixaRangeInputs();
   renderCaixaCal();
   renderCaixaList();
 }
-function applyCaixaFilters(){ renderCaixaList(); }
-function clearCaixaFilters(){
-  caixaCalToday();
-}
 function renderCaixaList(){
   const profId = document.getElementById('caixaProfFilter') ? document.getElementById('caixaProfFilter').value : 'all';
-  let list = bookings.filter(b => String(b.date).slice(0,10) === caixaSelectedDate);
+  // Só entra na Caixa o que foi validado pelo barbeiro (visita confirmada = serviço pago).
+  let list = bookings.filter(b => {
+    const dateIso = String(b.date).slice(0,10);
+    return dateIso >= caixaRangeFrom && dateIso <= caixaRangeTo && validatedBookingIds.has(String(b.id));
+  });
   if(profId !== 'all') list = list.filter(b => b.profId === Number(profId));
-  list.sort((a,b) => String(a.time).localeCompare(String(b.time)));
+  list.sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.time).localeCompare(String(b.time)));
 
   const wrap = document.getElementById('caixaList');
   const count = list.length;
-  const ds = new Date(caixaSelectedDate+'T00:00');
-  const dateLabel = `${weekdayFull[ds.getDay()]}, ${String(ds.getDate()).padStart(2,'0')} de ${monthNames[ds.getMonth()]}`;
-  document.getElementById('caixaCount').textContent = `${dateLabel} · ${count === 0 ? 'nenhum serviço' : count + (count === 1 ? ' serviço' : ' serviços')}`;
+  const df = new Date(caixaRangeFrom+'T00:00');
+  const dt = new Date(caixaRangeTo+'T00:00');
+  const rangeLabel = caixaRangeFrom === caixaRangeTo
+    ? `${weekdayFull[df.getDay()]}, ${String(df.getDate()).padStart(2,'0')} de ${monthNames[df.getMonth()]}`
+    : `${String(df.getDate()).padStart(2,'0')}/${String(df.getMonth()+1).padStart(2,'0')} a ${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('caixaCount').textContent = `${rangeLabel} · ${count === 0 ? 'nenhum serviço' : count + (count === 1 ? ' serviço' : ' serviços')}`;
 
   if(!list.length){
-    wrap.innerHTML = `<div class="empty-note">Nenhum serviço encontrado para o filtro selecionado.</div>`;
+    wrap.innerHTML = `<div class="empty-note">Nenhum serviço validado nesse período/filtro.</div>`;
+    document.getElementById('caixaByPayment').innerHTML = '';
   } else {
     wrap.innerHTML = list.map(b => {
       const s = services.find(x => x.id === b.serviceId);
@@ -3446,6 +3497,21 @@ function renderCaixaList(){
         </div>
       `;
     }).join('');
+
+    // Total separado por forma de pagamento (a que o cliente escolheu ao agendar)
+    const paymentIcons = { 'Pix': '💠', 'Crédito': '💳', 'Débito': '💳', 'Dinheiro': '💵' };
+    const byPayment = {};
+    list.forEach(b => {
+      const s = services.find(x => x.id === b.serviceId);
+      const method = b.payment || 'Não informado';
+      byPayment[method] = (byPayment[method] || 0) + (s ? Number(s.price) : 0);
+    });
+    document.getElementById('caixaByPayment').innerHTML = Object.entries(byPayment).map(([method, sum]) => `
+      <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--red-dim); font-size:.85rem;">
+        <span>${paymentIcons[method] || '💰'} ${method}</span>
+        <strong>R$ ${sum}</strong>
+      </div>
+    `).join('');
   }
 
   const total = list.reduce((sum, b) => {
