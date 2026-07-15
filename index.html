@@ -1475,9 +1475,8 @@ const avatarPalette = [
 
 let professionals = [];
 
-// Credenciais fixas do admin (mock). Em produção: usuário/senha com hash, validado no backend.
-const ADMIN_CREDENTIALS = {user:'admin', pass:'123456'};
-const ADMIN_DEFAULT_PASS = '123456'; // senha padrão para novos clientes
+// Usuário/senha do admin são validados no backend (saveAdminPass/adminLogin em Code.gs),
+// com a senha guardada com hash — assim funciona em qualquer dispositivo/navegador.
 
 // Configuração de funcionamento — valores padrão de segurança até o backend responder
 let businessConfig = {
@@ -1756,10 +1755,11 @@ function finishLogin(){
 async function doAdminLogin(){
   const u = document.getElementById('adminUser').value.trim();
   const p = document.getElementById('adminPass').value;
-  if(u !== ADMIN_CREDENTIALS.user || p !== ADMIN_CREDENTIALS.pass){
-    toast('Usuário ou senha incorretos');
-    return;
-  }
+  toast('Entrando...');
+  const res = await apiPost('adminLogin', { user: u, pass: p });
+  if(res.error){ toast(res.error); return; }
+  document.getElementById('adminPass').value = '';
+  if(res.firstAccess){ showScreen('screen-admin-first-access'); return; }
   enterAdmin();
   toast('Bem-vindo, administrador');
 }
@@ -1772,6 +1772,8 @@ async function saveNewAdminPass(){
   toast('Salvando...');
   const res = await apiPost('saveAdminPass', { pass: newPass });
   if(res.error){ toast('Erro: ' + res.error); return; }
+  document.getElementById('newAdminPass').value = '';
+  document.getElementById('confirmAdminPass').value = '';
   toast('✅ Senha definida com sucesso!');
   enterAdmin();
 }
