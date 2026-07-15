@@ -1453,10 +1453,15 @@ async function apiGet(){
   return res.json();
 }
 async function apiPost(action, data){
+  // Anexa o token de sessão do admin automaticamente em toda chamada feita
+  // enquanto logado como admin — o servidor confere esse token em toda ação
+  // restrita (ver Code.gs, requireAdmin_). Sem isso, ações administrativas
+  // seriam chamáveis por qualquer um, só sabendo o nome da ação.
+  const payload = state.adminToken ? { ...data, adminToken: state.adminToken } : data;
   const res = await fetch(API_BASE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita pre-flight CORS no Apps Script
-    body: JSON.stringify({ action, data })
+    body: JSON.stringify({ action, data: payload })
   });
   return res.json();
 }
@@ -1502,10 +1507,11 @@ const weekdayLabel = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const weekdayFull  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 
 let bookings = [];
+let myBookings = []; // agendamentos do cliente logado (com nome/telefone), carregados à parte dos públicos
 let validatedBookingIds = new Set();
 
 let state = {
-  loggedIn:false, isAdmin:false, userName:'Cliente', userPhone:null,
+  loggedIn:false, isAdmin:false, userName:'Cliente', userPhone:null, adminToken:null,
   activeCategory:'Todos',
   selectedService:null, selectedProf:null, selectedDate:null, selectedSlot:null, selectedPayment:null,
 };
@@ -1546,6 +1552,18 @@ function isoOffset(days){
 function fmtDateLong(iso){
   const d = new Date(iso+'T00:00');
   return `${weekdayFull[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}`;
+}
+// Escapa texto vindo de cliente (ex: nome no cadastro) antes de inserir via innerHTML —
+// sem isso, alguém poderia se cadastrar com um nome tipo "<img src=x onerror=...>" e
+// rodar script na sessão de quem visse esse nome (inclusive o admin no painel).
+function escapeHtml(str){
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Mesma ideia, mas pra quando o texto vai dentro de um atributo onclick="...('valor')" —
+// primeiro escapa pra não quebrar a string JS, depois escapa pra não quebrar o atributo HTML.
+function escapeForJsAttr(str){
+  const jsEscaped = String(str ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return escapeHtml(jsEscaped);
 }
 function toast(msg, duration=2200){
   const t = document.getElementById('toast');
@@ -1704,7 +1722,7 @@ async function doLogin(){
   if(res.error){ toast(res.error); return; }
   state.userName = res.name;
   state.userPhone = res.phone;
-  finishLogin();
+  await finishLogin();
   toast('Bem-vindo(a) de volta!');
 }
 async function doRegister(){
@@ -1719,7 +1737,7 @@ async function doRegister(){
   if(res.error){ toast(res.error); return; }
   state.userName = res.name;
   state.userPhone = res.phone;
-  finishLogin();
+  await finishLogin();
   toast('Conta criada com sucesso!');
 }
 const SESSION_KEY = 'monteiro_session_v1';
@@ -1729,6 +1747,7 @@ function saveSession(){
       isAdmin: state.isAdmin,
       userName: state.userName,
       userPhone: state.userPhone,
+      adminToken: state.adminToken,
     }));
   } catch(e){}
 }
@@ -1743,7 +1762,7 @@ function restoreSession(){
   } catch(e){ return false; }
 }
 
-function finishLogin(){
+async function finishLogin(){
   state.loggedIn = true; state.isAdmin = false;
   document.getElementById('homeUserName').textContent = capitalize(state.userName.split(' ')[0]);
   document.getElementById('navAdmin').style.display = 'none';
@@ -1751,7 +1770,19 @@ function finishLogin(){
   showScreen('screen-home'); setNav('home');
   updateReminderBanner();
   saveSession();
+  await loadMyBookings();
 }
+
+// Agendamentos do cliente logado (com nome/telefone) — carregados à parte da
+// lista pública (que não traz dados pessoais de ninguém). Basta o telefone,
+// igual ao "getLoyalty" já usado pra consultar o próprio cartão fidelidade.
+async function loadMyBookings(){
+  if(!state.userPhone){ myBookings = []; return; }
+  const res = await apiPost('getMyBookings', { phone: state.userPhone });
+  myBookings = res.error ? [] : (res.bookings || []);
+}
+let pendingFirstAccessToken = null; // token de curta duração devolvido pelo login com a senha padrão, usado só pra completar a troca de senha
+
 async function doAdminLogin(){
   const u = document.getElementById('adminUser').value.trim();
   const p = document.getElementById('adminPass').value;
@@ -1759,8 +1790,13 @@ async function doAdminLogin(){
   const res = await apiPost('adminLogin', { user: u, pass: p });
   if(res.error){ toast(res.error); return; }
   document.getElementById('adminPass').value = '';
-  if(res.firstAccess){ showScreen('screen-admin-first-access'); return; }
-  enterAdmin();
+  if(res.firstAccess){
+    pendingFirstAccessToken = res.firstAccessToken;
+    showScreen('screen-admin-first-access');
+    return;
+  }
+  state.adminToken = res.token;
+  await enterAdmin();
   toast('Bem-vindo, administrador');
 }
 
@@ -1770,14 +1806,27 @@ async function saveNewAdminPass(){
   if(newPass.length < 6){ toast('A senha deve ter pelo menos 6 caracteres'); return; }
   if(newPass !== confirmPass){ toast('As senhas não coincidem'); return; }
   toast('Salvando...');
-  const res = await apiPost('saveAdminPass', { pass: newPass });
+  const res = await apiPost('saveAdminPass', { pass: newPass, firstAccessToken: pendingFirstAccessToken });
   if(res.error){ toast('Erro: ' + res.error); return; }
+  pendingFirstAccessToken = null;
   document.getElementById('newAdminPass').value = '';
   document.getElementById('confirmAdminPass').value = '';
   toast('✅ Senha definida com sucesso!');
-  enterAdmin();
+  state.adminToken = res.token;
+  await enterAdmin();
 }
-function enterAdmin(){
+async function enterAdmin(){
+  // Reconfirma o token com o servidor e já traz os agendamentos completos
+  // (com nome/telefone) — só disponíveis pra quem tem token de admin válido.
+  const res = await apiPost('getAdminBookings', {});
+  if(res.error){
+    state.adminToken = null;
+    clearSession();
+    showScreen('screen-admin-login');
+    toast('Sessão de administrador expirada. Faça login novamente.');
+    return;
+  }
+  bookings = res.bookings;
   state.isAdmin = true;
   clientesCache = [];
   document.getElementById('navAdmin').style.display = 'flex';
@@ -1794,13 +1843,15 @@ function enterAdmin(){
 }
 function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 function logoutUser(){
-  state.loggedIn = false; state.isAdmin = false; state.userPhone = null;
+  state.loggedIn = false; state.isAdmin = false; state.userPhone = null; state.adminToken = null;
   state.selectedService = null; state.selectedProf = null; state.selectedDate = null; state.selectedSlot = null;
+  myBookings = [];
   document.getElementById('navAdmin').style.display = 'none';
   document.getElementById('navProfile').style.display = 'flex';
   document.getElementById('navHome').style.display = 'flex';
   document.getElementById('navAppt').style.display = 'flex';
   clearSession();
+  loadData(); // recarrega a versão pública (sem dados pessoais) por cima do que o admin tinha em memória
   showScreen('screen-login');
   toast('Você saiu da conta');
 }
@@ -2174,7 +2225,8 @@ async function confirmBooking(){
     if(res.error.includes('reservado por outra pessoa')) renderSlots(); // atualiza a grade de horários
     return;
   }
-  bookings.push({ id: res.id, ...payload });
+  bookings.push({ id: res.id, serviceId: payload.serviceId, profId: payload.profId, date: payload.date, time: payload.time });
+  myBookings.push({ id: res.id, ...payload });
 
   document.getElementById('successModalDetails').innerHTML = `
     <div class="confirm-row"><span>Serviço</span><strong>${state.selectedService.name}</strong></div>
@@ -2196,9 +2248,7 @@ function closeSuccessModal(){
 function renderAppointments(){
   updateReminderBanner();
   const wrap = document.getElementById('apptList');
-  const myPhone = String(state.userPhone || '').replace(/\D/g,'');
-  const mine = bookings.filter(b => String(b.clientPhone || '').replace(/\D/g,'') === myPhone);
-  const upcoming = [...mine].sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
+  const upcoming = [...myBookings].sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
   if(!upcoming.length){
     wrap.innerHTML = `<div class="empty-note">Você ainda não tem agendamentos.</div>`;
     return;
@@ -2221,9 +2271,10 @@ function renderAppointments(){
   }).join('');
 }
 async function cancelBooking(id){
-  const res = await apiPost('cancelBooking', { id, source: 'client' });
+  const res = await apiPost('cancelBooking', { id, source: 'client', phone: state.userPhone });
   if(res.error){ toast(res.error); return; }
   bookings = bookings.filter(b=>b.id!==id);
+  myBookings = myBookings.filter(b=>b.id!==id);
   renderAppointments();
   toast('Agendamento cancelado');
 }
@@ -2514,7 +2565,8 @@ async function confirmPlanBooking(){
     return;
   }
   (res.dates || []).forEach((d, i) => {
-    bookings.push({ id: res.ids[i], serviceId: comboService.id, profId, date: d, time: slot, clientName: state.userName, clientPhone: state.userPhone, payment: `Plano ${plan.name}` });
+    bookings.push({ id: res.ids[i], serviceId: comboService.id, profId, date: d, time: slot });
+    myBookings.push({ id: res.ids[i], serviceId: comboService.id, profId, date: d, time: slot, clientName: state.userName, clientPhone: state.userPhone, payment: `Plano ${plan.name}` });
   });
   toast(`✅ Plano ${plan.name} agendado! 4 semanas confirmadas.`, 4000);
   showScreen('screen-appointments'); setNav('appointments');
@@ -3002,13 +3054,13 @@ function renderAgendaApptList(){
     const waLink = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
     const payLabel = b.payment || '';
     const phoneFormatted = formatPhoneBR(phone);
-    const clientNameSafe = (b.clientName || 'Cliente').replace(/'/g, "\\'");
+    const clientNameSafe = escapeForJsAttr(b.clientName || 'Cliente');
     return `
       <div class="appt-card">
         <div class="appt-card-top">
           <div class="appt-date"><span>${dayLabel}</span><strong>${dayNum}</strong></div>
           <div class="appt-info">
-            <h3 ${phone ? `onclick="goToClientLoyalty('${clientNameSafe}','${phone}')" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px;"` : ''}>${b.clientName || 'Cliente'}</h3>
+            <h3 ${phone ? `onclick="goToClientLoyalty('${clientNameSafe}','${phone}')" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px;"` : ''}>${escapeHtml(b.clientName || 'Cliente')}</h3>
             ${phoneFormatted ? `<a href="tel:+55${phone}" class="appt-phone">${phoneFormatted}</a>` : ''}
             <p>${s ? s.name : 'Servico'} · ${timeStr}</p>
             ${payLabel ? `<p style="color:var(--green-bright); font-size:.8rem; margin-top:2px;">💳 ${payLabel}</p>` : ''}
@@ -3539,7 +3591,7 @@ function renderLoyaltyModalBody(name, total, visits){
   const resetBtn = total >= 10 ? `
     <div style="margin:14px 0 0; padding:12px 14px; background:rgba(63,174,102,.08); border:1px solid rgba(63,174,102,.25); border-radius:10px;">
       <div style="font-size:.78rem; color:var(--green-bright); margin-bottom:10px;">🎉 Cliente com direito ao serviço GRÁTIS! Após o uso do brinde, zere o cartão.</div>
-      <button class="btn btn-green" style="width:100%;" onclick="confirmResetLoyalty('${(name||'').replace(/'/g,"\\'")}')">🔄 Zerar cartão fidelidade</button>
+      <button class="btn btn-green" style="width:100%;" onclick="confirmResetLoyalty('${escapeForJsAttr(name||'')}')">🔄 Zerar cartão fidelidade</button>
     </div>` : '';
 
   document.getElementById('loyaltyModalBody').innerHTML = `
@@ -3647,11 +3699,12 @@ async function renderClientesTab(){
     }
     const waLink = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(waText)}` : '';
 
+    const clientNameSafe = escapeForJsAttr(c.name || '');
     return `
-      <div class="client-card ${colorClass}" onclick="openLoyaltyModal('${(c.name||'').replace(/'/g,"\\'")}','${String(c.phone||'').replace(/\D/g,'')}',${loyalty})">
+      <div class="client-card ${colorClass}" onclick="openLoyaltyModal('${clientNameSafe}','${String(c.phone||'').replace(/\D/g,'')}',${loyalty})">
         <div class="client-card-top">
           <div>
-            <div class="client-name">${c.name || 'Sem nome'}</div>
+            <div class="client-name">${escapeHtml(c.name || 'Sem nome')}</div>
             <div class="client-phone">${phoneFormatted}</div>
           </div>
           ${days !== null ? `<span class="client-days-badge ${colorClass}">${daysLabel}</span>` : ''}
@@ -3665,7 +3718,7 @@ async function renderClientesTab(){
             ${waLink ? `<button class="icon-btn small" onclick="event.stopPropagation(); openWhatsApp('${waLink}')" title="Enviar mensagem" style="color:#25D366;">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
             </button>` : ''}
-            <button class="icon-btn small" onclick="event.stopPropagation(); confirmDeleteClient('${(c.name||'').replace(/'/g,"\\'")}','${phone}')" title="Excluir cliente" style="color:var(--red-bright);">
+            <button class="icon-btn small" onclick="event.stopPropagation(); confirmDeleteClient('${clientNameSafe}','${phone}')" title="Excluir cliente" style="color:var(--red-bright);">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
             </button>
           </div>
@@ -3831,7 +3884,7 @@ function renderCaixaList(){
         <div class="service-card">
           <div class="service-bar"></div>
           <div class="service-info">
-            <h3>${b.clientName || 'Cliente'}</h3>
+            <h3>${escapeHtml(b.clientName || 'Cliente')}</h3>
             <p>${s ? s.name : 'Serviço'} · ${p ? p.name : '—'} · ${dateLabel} · ${timeStr || '—'}</p>
             ${payLabel ? `<p style="color:var(--green-bright); font-size:.8rem; margin-top:2px;">${payLabel}</p>` : ''}
           </div>
@@ -3890,7 +3943,10 @@ async function init(){
     state.userName  = session.userName  || 'Cliente';
     state.userPhone = session.userPhone || null;
     if(session.isAdmin){
-      enterAdmin();
+      // enterAdmin() reconfirma o token com o servidor antes de liberar o painel —
+      // um "isAdmin:true" sozinho no localStorage não basta (poderia ser forjado).
+      state.adminToken = session.adminToken || null;
+      await enterAdmin();
     } else {
       state.loggedIn = true; state.isAdmin = false;
       document.getElementById('homeUserName').textContent = capitalize((state.userName||'').split(' ')[0]);
@@ -3898,6 +3954,8 @@ async function init(){
       renderCategoryChips(); renderServices();
       showScreen('screen-home'); setNav('home');
       updateReminderBanner();
+      await loadMyBookings();
+      renderAppointments();
     }
   }
 }
