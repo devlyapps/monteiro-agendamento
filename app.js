@@ -373,6 +373,17 @@ async function doLogin(){
   await finishLogin();
   toast('Bem-vindo(a) de volta!');
 }
+// Não existe envio automático de SMS/e-mail — o app abre o WhatsApp da barbearia
+// com uma mensagem pronta, e o admin redefine a senha manualmente pelo painel
+// (aba Clientes) e repassa a nova senha na conversa.
+function requestPasswordRecovery(){
+  const digits = document.getElementById('loginPhone').value.replace(/\D/g,'');
+  if(digits.length < 10){ toast('Digite seu celular no campo acima antes de solicitar a recuperação'); return; }
+  const msg = encodeURIComponent(`Olá! Esqueci minha senha do app da Barbearia Monteiro. Meu celular cadastrado é ${formatPhoneBR(digits)}. Pode me ajudar a redefinir?`);
+  window.open(`https://wa.me/5519994590300?text=${msg}`, '_blank');
+  toast('Envie a mensagem pelo WhatsApp para solicitar a nova senha');
+}
+
 async function doRegister(){
   const name = document.getElementById('regName').value.trim();
   const digits = document.getElementById('regPhone').value.replace(/\D/g,'');
@@ -2375,6 +2386,9 @@ async function renderClientesTab(){
             ${waLink ? `<button class="icon-btn small" onclick="event.stopPropagation(); openWhatsApp('${waLink}')" title="Enviar mensagem" style="color:#25D366;">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
             </button>` : ''}
+            <button class="icon-btn small" onclick="event.stopPropagation(); confirmResetClientPassword('${clientNameSafe}','${phone}')" title="Redefinir senha">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            </button>
             <button class="icon-btn small" onclick="event.stopPropagation(); confirmDeleteClient('${clientNameSafe}','${phone}')" title="Excluir cliente" style="color:var(--red-bright);">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
             </button>
@@ -2382,6 +2396,19 @@ async function renderClientesTab(){
         </div>
       </div>`;
   }).join('');
+}
+
+/* ===================== ADMIN · REDEFINIR SENHA DO CLIENTE ===================== */
+function confirmResetClientPassword(name, phone){
+  if(!confirm(`Gerar uma nova senha temporária para "${name}"?\n\nA senha atual dele deixará de funcionar.`)) return;
+  resetClientPassword(name, phone);
+}
+
+async function resetClientPassword(name, phone){
+  toast('Gerando nova senha...');
+  const res = await apiPost('resetClientPassword', { phone });
+  if(res.error){ toast('Erro: ' + res.error); return; }
+  alert(`Nova senha temporária de ${name}: ${res.tempPassword}\n\nEnvie esse código para o cliente pelo WhatsApp.`);
 }
 
 /* ===================== ADMIN · EXCLUIR CLIENTE ===================== */
