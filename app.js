@@ -542,9 +542,9 @@ function setCategory(c){ state.activeCategory = c; renderCategoryChips(); render
 // pelo admin na aba Serviços (duração = soma dos serviços do combo, preço R$0
 // porque já foi pago à vista no Pix ao contratar o plano).
 const SERVICE_PLANS = [
-  { id:'bronze',   name:'Bronze',   price:110, img:'plan-bronze.png',   accent:'var(--plan-bronze)',   accentDim:'rgba(201,138,82,.25)',  services:['4x Corte'],                          comboServiceName:'Combo Bronze' },
-  { id:'gold',     name:'Gold',     price:140, img:'plan-gold.png',     accent:'var(--plan-gold)',     accentDim:'rgba(232,184,76,.25)',  services:['4x Corte','4x Sobrancelha'],         comboServiceName:'Combo Gold' },
-  { id:'platinum', name:'Platinum', price:220, img:'plan-platinum.png', accent:'var(--plan-platinum)', accentDim:'rgba(207,214,218,.25)', services:['4x Corte','4x Barba','4x Sobrancelha'], comboServiceName:'Combo Platinum' },
+  { id:'bronze',   name:'Bronze',   price:110, img:'plan-bronze.png',   accent:'var(--plan-bronze)',   accentDim:'rgba(201,138,82,.25)',  services:['4x Corte'],                          comboServiceName:'Pacote Bronze' },
+  { id:'gold',     name:'Gold',     price:140, img:'plan-gold.png',     accent:'var(--plan-gold)',     accentDim:'rgba(232,184,76,.25)',  services:['4x Corte','4x Sobrancelha'],         comboServiceName:'Pacote Gold' },
+  { id:'platinum', name:'Platinum', price:220, img:'plan-platinum.png', accent:'var(--plan-platinum)', accentDim:'rgba(207,214,218,.25)', services:['4x Corte','4x Barba','4x Sobrancelha'], comboServiceName:'Pacote Platinum' },
 ];
 function renderServicePlans(){
   const wrap = document.getElementById('plansRow');
