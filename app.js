@@ -22,15 +22,17 @@ function initFcm(){
 
 function updateReminderBanner(){
   const supported = 'Notification' in window && fcmMessaging;
-  // Banner na tela inicial — só mostra se ainda não decidiu
+  // Os 3 banners só aparecem enquanto o navegador ainda não decidiu a permissão
+  // (Notification.permission === 'default'). Uma vez concedida (ou negada), fica
+  // 'granted'/'denied' permanentemente — o banner some e não volta mais, mesmo
+  // depois de recarregar a página ou trocar de tela.
+  const notDecided = supported && Notification.permission === 'default';
   const b1 = document.getElementById('reminderBanner');
-  if(b1) b1.style.display = (supported && Notification.permission === 'default') ? 'block' : 'none';
-  // Banner na tela Meus Horários — mostra sempre que o token não foi registrado ainda
+  if(b1) b1.style.display = notDecided ? 'block' : 'none';
   const b2 = document.getElementById('reminderApptBanner');
-  if(b2) b2.style.display = supported ? 'block' : 'none';
-  // Banner no painel admin — só mostra se ainda não decidiu
+  if(b2) b2.style.display = notDecided ? 'block' : 'none';
   const b3 = document.getElementById('adminReminderBanner');
-  if(b3) b3.style.display = (supported && Notification.permission === 'default') ? 'block' : 'none';
+  if(b3) b3.style.display = notDecided ? 'block' : 'none';
 }
 
 async function enablePushReminders(){
@@ -561,7 +563,7 @@ function renderServicePlans(){
       </ul>
       <p class="plan-freq">Podendo cortar 1x por semana (4x no mês) · Terça a Sexta</p>
       <div class="plan-warning">⚠️ Marcou e não veio, perde o dia da semana.</div>
-      <button class="plan-cta" onclick="openPlanPixModal('${p.id}')">Quero esse plano</button>
+      <button class="plan-cta" onclick="startPlanBooking('${p.id}')">Quero esse plano</button>
     </div>
   `).join('');
 }
@@ -917,10 +919,14 @@ function renderAppointments(){
     wrap.innerHTML = `<div class="empty-note">Você ainda não tem agendamentos.</div>`;
     return;
   }
+  const now = new Date();
   wrap.innerHTML = upcoming.map(b => {
     const s = services.find(x=>x.id===b.serviceId);
     const p = professionals.find(x=>x.id===b.profId);
     const d = new Date(b.date+'T00:00');
+    // Cancelamento só é permitido até 2h antes do horário marcado.
+    const apptDateTime = new Date(`${b.date}T${b.time}:00`);
+    const canCancel = (apptDateTime - now) >= 2*60*60*1000;
     return `
       <div class="appt-card">
         <div class="appt-date"><span>${weekdayLabel[d.getDay()]}</span><strong>${String(d.getDate()).padStart(2,'0')}</strong></div>
@@ -930,7 +936,7 @@ function renderAppointments(){
         </div>
         <div class="appt-status">Confirmado</div>
       </div>
-      <div class="appt-actions"><button class="link-danger" onclick="cancelBooking(${b.id})">Cancelar agendamento</button></div>
+      ${canCancel ? `<div class="appt-actions"><button class="link-danger" onclick="cancelBooking(${b.id})">Cancelar agendamento</button></div>` : ''}
     `;
   }).join('');
 }
@@ -1033,7 +1039,10 @@ function sendPixComprovante(){
     const msg = encodeURIComponent(`Ola! Acabei de pagar o Pix referente ao Plano ${plan.name} (R$ ${plan.price}/mes) da Barbearia Monteiro. Segue o comprovante em anexo.`);
     window.open(`https://wa.me/5519994800891?text=${msg}`, '_blank');
     closePixModal();
-    openPlanBookingScreen(plan);
+    // As 4 semanas já foram reservadas antes do Pix aparecer — só falta mostrar
+    // pro cliente o que ele acabou de agendar.
+    showScreen('screen-appointments'); setNav('appointments');
+    renderAppointments();
     return;
   }
   const price   = state.selectedService ? state.selectedService.price : '?';
@@ -1050,6 +1059,15 @@ function sendPixComprovante(){
 let planBookingState = { plan:null, comboService:null, profId:null, date:null, slot:null };
 let planCalYear  = new Date().getFullYear();
 let planCalMonth = new Date().getMonth();
+
+// Ponto de entrada do botão "Quero esse plano": vai direto pra escolha de
+// horário. O pagamento (Pix) só aparece depois que as 4 semanas já estão
+// reservadas — ver confirmPlanBooking().
+function startPlanBooking(planId){
+  const plan = SERVICE_PLANS.find(p => p.id === planId);
+  if(!plan) return;
+  openPlanBookingScreen(plan);
+}
 
 function openPlanBookingScreen(plan){
   const comboService = services.find(s => s.name === plan.comboServiceName);
@@ -1232,9 +1250,9 @@ async function confirmPlanBooking(){
     bookings.push({ id: res.ids[i], serviceId: comboService.id, profId, date: d, time: slot });
     myBookings.push({ id: res.ids[i], serviceId: comboService.id, profId, date: d, time: slot, clientName: state.userName, clientPhone: state.userPhone, payment: `Plano ${plan.name}` });
   });
-  toast(`✅ Plano ${plan.name} agendado! 4 semanas confirmadas.`, 4000);
-  showScreen('screen-appointments'); setNav('appointments');
-  renderAppointments();
+  toast(`✅ 4 semanas reservadas! Finalize o pagamento a seguir.`, 3500);
+  // Horários já garantidos — agora sim mostra o Pix pra concluir o pagamento.
+  openPlanPixModal(plan.id);
 }
 
 async function validateClientVisit(phone, serviceName, date, bookingId){
