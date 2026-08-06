@@ -2340,6 +2340,8 @@ async function renderClientesTab(){
     );
   }
 
+  list = [...list].sort((a,b) => (a.name||'').localeCompare(b.name||'', 'pt-BR', {sensitivity:'base'}));
+
   if(!list.length){
     wrap.innerHTML = `<div class="empty-note">Nenhum cliente encontrado.</div>`;
     return;
