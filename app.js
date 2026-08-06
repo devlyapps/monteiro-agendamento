@@ -2316,6 +2316,35 @@ async function resetLoyaltyCard(name){
 
 /* ===================== ADMIN · CLIENTES ===================== */
 let clientesCache = [];
+let clientDayFilter = null; // null | 15 | 30 — filtro dos cards de estatística
+function daysSinceLastVisit(c){
+  return c.daysSinceValidated !== null ? c.daysSinceValidated : c.daysSinceBooking;
+}
+function renderClientStatCards(){
+  const wrap = document.getElementById('clientStatsCards');
+  if(!wrap) return;
+  let over15 = 0, over30 = 0;
+  clientesCache.forEach(c => {
+    const days = daysSinceLastVisit(c);
+    if(days !== null && days > 15) over15++;
+    if(days !== null && days > 30) over30++;
+  });
+  const cards = [
+    { key: null, label: 'Total de clientes', value: clientesCache.length, tone: '' },
+    { key: 15,   label: '>15 dias sem visita', value: over15, tone: 'warn' },
+    { key: 30,   label: '>30 dias sem visita', value: over30, tone: 'danger' },
+  ];
+  wrap.innerHTML = cards.map(c => `
+    <div class="client-stat-card ${c.tone} ${clientDayFilter === c.key ? 'active' : ''}" onclick="setClientDayFilter(${c.key})">
+      <strong>${c.value}</strong>
+      <span>${c.label}</span>
+    </div>
+  `).join('');
+}
+function setClientDayFilter(key){
+  clientDayFilter = (clientDayFilter === key) ? null : key;
+  renderClientesTab();
+}
 async function renderClientesTab(){
   const wrap = document.getElementById('clientesList');
   if(!wrap) return;
@@ -2326,6 +2355,8 @@ async function renderClientesTab(){
     if(res.error){ wrap.innerHTML = `<div class="empty-note">Erro ao carregar clientes.</div>`; return; }
     clientesCache = Array.isArray(res) ? res : [];
   }
+
+  renderClientStatCards();
 
   const q = (document.getElementById('clientSearch')?.value || '').toLowerCase().trim();
   let list = clientesCache;
@@ -2339,6 +2370,12 @@ async function renderClientesTab(){
       (qDigits && (c.phone||'').includes(qDigits))
     );
   }
+  if(clientDayFilter){
+    list = list.filter(c => {
+      const days = daysSinceLastVisit(c);
+      return days !== null && days > clientDayFilter;
+    });
+  }
 
   list = [...list].sort((a,b) => (a.name||'').localeCompare(b.name||'', 'pt-BR', {sensitivity:'base'}));
 
@@ -2348,7 +2385,7 @@ async function renderClientesTab(){
   }
 
   wrap.innerHTML = list.map(c => {
-    const days = c.daysSinceValidated !== null ? c.daysSinceValidated : c.daysSinceBooking;
+    const days = daysSinceLastVisit(c);
     let colorClass = '';
     if(days === null)      colorClass = '';
     else if(days <= 15)   colorClass = 'green';
@@ -2365,7 +2402,7 @@ async function renderClientesTab(){
     const loyaltyNext = loyalty >= 10 ? '🎉 Grátis!' : loyalty >= 5 ? `${10-loyalty} p/ grátis` : `${5-loyalty} p/ 10% OFF`;
 
     // Mensagem WhatsApp personalizada
-    let waText = `Ola, ${c.name}! Tudo bem? Passando para lembrar que ja faz ${days} dias desde o seu ultimo atendimento. Saudades de voce aqui na Barbearia Monteiro!`;
+    let waText = `Ola, ${c.name}! Tudo bem? Passando para lembrar que ja faz ${days} dias desde o seu ultimo atendimento. Estamos com saudades e com horarios disponiveis para agendamento!`;
     if(loyalty >= 6 && loyalty < 11){
       waText += ` Voce esta a ${11-loyalty} visita${10-loyalty>1?'s':''} de ganhar um servico GRATIS!`;
     } else if(loyalty < 5){

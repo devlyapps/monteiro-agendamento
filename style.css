@@ -596,6 +596,18 @@
   .share-actions .btn{ flex:1; }
 
   /* ---------- CARD CLIENTE ---------- */
+  .client-stats-row{display:flex; gap:10px; padding:0 22px 14px;}
+  .client-stat-card{
+    flex:1; text-align:center; padding:12px 8px; border-radius:var(--radius-sm);
+    background:var(--surface); border:1px solid var(--red-dim); cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .client-stat-card strong{display:block; font-family:'Playfair Display',serif; font-size:1.3rem; color:var(--cream);}
+  .client-stat-card span{display:block; font-size:.66rem; color:var(--muted); margin-top:2px; line-height:1.3;}
+  .client-stat-card.active{border-color:var(--red-bright); background:var(--surface-2);}
+  .client-stat-card.warn strong{color:#f0c040;}
+  .client-stat-card.danger strong{color:#e2543a;}
+
   .client-card{
     margin:0 22px 12px; padding:14px 16px; border-radius:var(--radius);
     background:var(--surface); border-left:4px solid var(--red-dim);
