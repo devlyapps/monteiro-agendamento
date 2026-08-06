@@ -705,7 +705,11 @@ function generateSlots(dateIso, profId){
   const occupiedMins = new Set();
   bookings.filter(b => b.profId === profId && b.date === dateIso).forEach(b => {
     const booked = services.find(s => s.id === Number(b.serviceId));
-    const dur = booked ? Number(booked.duration) : businessConfig.interval;
+    // Fallback pro intervalo padrão se o serviço não tiver duração válida
+    // cadastrada (0, vazio etc) — senão o horário ocupado por ele não é
+    // considerado e a vaga aparece como livre por engano.
+    const bookedDur = booked ? Number(booked.duration) : NaN;
+    const dur = (bookedDur > 0) ? bookedDur : businessConfig.interval;
     const [bh, bm] = (b.time||'00:00').split(':').map(Number);
     const start = bh*60+bm;
     for(let t = start; t < start + dur; t += businessConfig.interval){
@@ -713,8 +717,9 @@ function generateSlots(dateIso, profId){
     }
   });
 
-  // Duração do serviço que está sendo consultado agora
-  const serviceDuration = state.selectedService ? Number(state.selectedService.duration) : businessConfig.interval;
+  // Duração do serviço que está sendo consultado agora (mesmo fallback do laço acima)
+  const selectedDur = state.selectedService ? Number(state.selectedService.duration) : NaN;
+  const serviceDuration = (selectedDur > 0) ? selectedDur : businessConfig.interval;
 
   for(const block of blocks){
     let cur = block.start;
@@ -1203,26 +1208,53 @@ function selectPlanSlot(time){
   updatePlanConfirmBtn();
   renderPlanDatesPreview();
 }
-function renderPlanDatesPreview(){
-  const el = document.getElementById('planDatesPreview');
-  if(!el) return;
-  if(!planBookingState.date || !planBookingState.slot){ el.innerHTML = ''; return; }
+// Datas ISO das 4 semanas do plano, a partir do dia escolhido como início.
+function getPlanWeekDatesIso(){
   const start = new Date(planBookingState.date+'T00:00');
   const dates = [];
   for(let i = 0; i < 4; i++){
     const d = new Date(start);
     d.setDate(d.getDate() + i*7);
-    dates.push(`${weekdayLabel[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`);
+    dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
   }
+  return dates;
+}
+// A tela só deixa escolher horário olhando a 1ª semana — sem isso, a 2ª/3ª/4ª
+// semana podia cair num horário já ocupado sem o cliente nunca ver um aviso
+// (só descobriria com o erro do servidor ao confirmar, ou nem isso).
+function getPlanWeekConflicts(){
+  if(!planBookingState.date || !planBookingState.slot || !planBookingState.profId) return [];
+  const prevService = state.selectedService;
+  state.selectedService = planBookingState.comboService;
+  const conflicts = getPlanWeekDatesIso().map(iso => {
+    const slot = generateSlots(iso, planBookingState.profId).find(s => s.time === planBookingState.slot);
+    return !slot || !slot.available;
+  });
+  state.selectedService = prevService;
+  return conflicts;
+}
+function renderPlanDatesPreview(){
+  const el = document.getElementById('planDatesPreview');
+  if(!el) return;
+  if(!planBookingState.date || !planBookingState.slot){ el.innerHTML = ''; return; }
+  const isoDates = getPlanWeekDatesIso();
+  const conflicts = getPlanWeekConflicts();
   el.innerHTML = `
     <div style="font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px;">Suas 4 datas</div>
     <div style="display:flex; flex-direction:column; gap:6px;">
-      ${dates.map((d,i) => `<div style="display:flex; justify-content:space-between; font-size:.85rem; color:var(--cream); background:var(--surface); border:1px solid var(--red-dim); border-radius:10px; padding:9px 12px;"><span>Semana ${i+1}</span><strong>${d} · ${planBookingState.slot}</strong></div>`).join('')}
+      ${isoDates.map((iso,i) => {
+        const d = new Date(iso+'T00:00');
+        const label = `${weekdayLabel[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+        const conflict = conflicts[i];
+        return `<div style="display:flex; justify-content:space-between; font-size:.85rem; color:${conflict?'var(--red-bright)':'var(--cream)'}; background:var(--surface); border:1px solid ${conflict?'var(--red-bright)':'var(--red-dim)'}; border-radius:10px; padding:9px 12px;"><span>Semana ${i+1}</span><strong>${label} · ${planBookingState.slot}${conflict ? ' — ocupado' : ''}</strong></div>`;
+      }).join('')}
     </div>
+    ${conflicts.some(Boolean) ? `<div style="margin-top:10px; font-size:.78rem; color:var(--red-bright);">⚠️ Uma ou mais semanas já têm esse horário ocupado. Escolha outro profissional, dia ou horário.</div>` : ''}
   `;
 }
 function updatePlanConfirmBtn(){
-  document.getElementById('planConfirmBtn').disabled = !planBookingState.profId || !planBookingState.date || !planBookingState.slot;
+  const hasConflict = getPlanWeekConflicts().some(Boolean);
+  document.getElementById('planConfirmBtn').disabled = !planBookingState.profId || !planBookingState.date || !planBookingState.slot || hasConflict;
 }
 
 async function confirmPlanBooking(){
