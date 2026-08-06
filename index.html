@@ -154,7 +154,8 @@
       <button class="icon-btn" onclick="showScreen('screen-home')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <h2 class="display">Agendamento</h2>
+      <h2 class="display" id="bkTitle">Agendamento</h2>
+      <button id="cancelEditBtn" onclick="cancelEditBooking()" style="display:none; font-size:.72rem; color:var(--muted); background:none; border:none; cursor:pointer; white-space:nowrap;">Cancelar edição</button>
     </div>
 
     <div class="summary-chip">
@@ -520,6 +521,28 @@
       <h2 class="display">Meu Perfil</h2>
     </div>
 
+    <div class="profile-edit-card">
+      <div class="profile-avatar-wrap" onclick="document.getElementById('profilePhotoInput').click()">
+        <img id="profileAvatarImg" alt="Foto de perfil" style="display:none;">
+        <div id="profileAvatarPlaceholder" class="profile-avatar-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <span class="profile-avatar-edit-badge">✎</span>
+      </div>
+      <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="handleProfilePhotoUpload(this)">
+
+      <div class="field"><label>Nome</label><input id="profileNameInput" type="text" placeholder="Seu nome"></div>
+      <button class="btn btn-gold" onclick="saveProfileInfo()">Salvar alterações</button>
+
+      <div class="divider-row"><div class="line"></div><span>SENHA</span><div class="line"></div></div>
+
+      <div class="field"><label>Nova senha</label><input id="profileNewPass" type="password" placeholder="Mínimo 4 caracteres"></div>
+      <div class="field"><label>Confirmar nova senha</label><input id="profileConfirmPass" type="password" placeholder="Repita a nova senha"></div>
+      <button class="btn btn-ghost" onclick="saveProfilePassword()">Alterar senha</button>
+    </div>
+
+    <div class="section-label" style="margin-top:6px;"><span>Cartão fidelidade</span><div class="line"></div></div>
+
     <div class="loyalty-card">
       <div class="loyalty-header">
         <div>
@@ -560,7 +583,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M12 3a9 9 0 100 18 9 9 0 000-18z"/></svg>
       <span>Horários</span>
     </button>
-    <button class="nav-item" id="navProfile" onclick="showScreen('screen-profile'); setNav('profile'); loadLoyalty()">
+    <button class="nav-item" id="navProfile" onclick="showScreen('screen-profile'); setNav('profile'); loadLoyalty(); renderProfileEdit()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
       <span>Perfil</span>
     </button>
@@ -626,7 +649,7 @@
       <div class="confirm-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 13l4 4L19 7"/></svg>
       </div>
-      <h2 class="display">Agendamento realizado com sucesso!</h2>
+      <h2 class="display" id="successModalTitle">Agendamento realizado com sucesso!</h2>
       <p class="muted">Você receberá uma confirmação por WhatsApp/e-mail antes do horário marcado.</p>
       <div class="confirm-card" id="successModalDetails"></div>
       <button class="btn btn-green" onclick="closeSuccessModal()">Ver meus horários</button>

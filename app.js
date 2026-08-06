@@ -153,13 +153,14 @@ let myBookings = []; // agendamentos do cliente logado (com nome/telefone), carr
 let validatedBookingIds = new Set();
 
 let state = {
-  loggedIn:false, isAdmin:false, userName:'Cliente', userPhone:null, adminToken:null,
+  loggedIn:false, isAdmin:false, userName:'Cliente', userPhone:null, userPhoto:null, adminToken:null,
   activeCategory:'Todos',
   selectedService:null, selectedProf:null, selectedDate:null, selectedSlot:null, selectedPayment:null,
 };
 let editingStaffId = null;
 let editingServiceId = null;
 let selectedAgendaStaff = null;
+let editingBookingId = null; // id do agendamento sendo editado pelo cliente (null = agendamento novo)
 
 /* ===================== CARREGAMENTO DE DADOS ===================== */
 async function loadData(){
@@ -372,6 +373,7 @@ async function doLogin(){
   if(res.error){ toast(res.error); return; }
   state.userName = res.name;
   state.userPhone = res.phone;
+  state.userPhoto = res.photoUrl || null;
   await finishLogin();
   toast('Bem-vindo(a) de volta!');
 }
@@ -398,6 +400,7 @@ async function doRegister(){
   if(res.error){ toast(res.error); return; }
   state.userName = res.name;
   state.userPhone = res.phone;
+  state.userPhoto = null;
   await finishLogin();
   toast('Conta criada com sucesso!');
 }
@@ -408,6 +411,7 @@ function saveSession(){
       isAdmin: state.isAdmin,
       userName: state.userName,
       userPhone: state.userPhone,
+      userPhoto: state.userPhoto,
       adminToken: state.adminToken,
     }));
   } catch(e){}
@@ -504,9 +508,10 @@ async function enterAdmin(){
 }
 function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 function logoutUser(){
-  state.loggedIn = false; state.isAdmin = false; state.userPhone = null; state.adminToken = null;
+  state.loggedIn = false; state.isAdmin = false; state.userPhone = null; state.userPhoto = null; state.adminToken = null;
   state.selectedService = null; state.selectedProf = null; state.selectedDate = null; state.selectedSlot = null;
   myBookings = [];
+  editingBookingId = null;
   document.getElementById('navAdmin').style.display = 'none';
   document.getElementById('navProfile').style.display = 'flex';
   document.getElementById('navHome').style.display = 'flex';
@@ -515,6 +520,79 @@ function logoutUser(){
   loadData(); // recarrega a versão pública (sem dados pessoais) por cima do que o admin tinha em memória
   showScreen('screen-login');
   toast('Você saiu da conta');
+}
+
+/* ===================== PERFIL DO CLIENTE ===================== */
+function renderProfileEdit(){
+  const nameInput = document.getElementById('profileNameInput');
+  if(nameInput) nameInput.value = state.userName || '';
+  const img = document.getElementById('profileAvatarImg');
+  const placeholder = document.getElementById('profileAvatarPlaceholder');
+  if(!img || !placeholder) return;
+  if(state.userPhoto){
+    img.src = state.userPhoto;
+    img.style.display = 'block';
+    placeholder.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    placeholder.style.display = 'flex';
+  }
+}
+
+let profilePhotoData = null; // foto pendente de salvar (base64); null = sem alteração desde a última vez que salvou
+function handleProfilePhotoUpload(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      // Mesma compressão usada nas fotos de serviço, pra caber no limite de célula do Sheets.
+      const MAX = 300;
+      let w = img.width, h = img.height;
+      if(w > h){ if(w > MAX){ h = Math.round(h * MAX / w); w = MAX; } }
+      else      { if(h > MAX){ w = Math.round(w * MAX / h); h = MAX; } }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      profilePhotoData = canvas.toDataURL('image/jpeg', 0.75);
+      const preview = document.getElementById('profileAvatarImg');
+      const placeholder = document.getElementById('profileAvatarPlaceholder');
+      preview.src = profilePhotoData;
+      preview.style.display = 'block';
+      placeholder.style.display = 'none';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveProfileInfo(){
+  const name = (document.getElementById('profileNameInput').value || '').trim();
+  if(!name){ toast('Digite seu nome'); return; }
+  toast('Salvando...');
+  const payload = { phone: state.userPhone, name };
+  if(profilePhotoData !== null) payload.photoUrl = profilePhotoData;
+  const res = await apiPost('updateClientProfile', payload);
+  if(res.error){ toast('Erro: ' + res.error); return; }
+  state.userName = name;
+  if(profilePhotoData !== null){ state.userPhoto = profilePhotoData; profilePhotoData = null; }
+  document.getElementById('homeUserName').textContent = capitalize(name.split(' ')[0]);
+  saveSession();
+  toast('✅ Perfil atualizado!');
+}
+
+async function saveProfilePassword(){
+  const pass = document.getElementById('profileNewPass').value;
+  const confirmPass = document.getElementById('profileConfirmPass').value;
+  if(!pass || pass.length < 4){ toast('A senha precisa de ao menos 4 caracteres'); return; }
+  if(pass !== confirmPass){ toast('As senhas não coincidem'); return; }
+  toast('Alterando senha...');
+  const res = await apiPost('updateClientPassword', { phone: state.userPhone, password: pass });
+  if(res.error){ toast('Erro: ' + res.error); return; }
+  document.getElementById('profileNewPass').value = '';
+  document.getElementById('profileConfirmPass').value = '';
+  toast('✅ Senha alterada!');
 }
 
 
@@ -626,11 +704,31 @@ function openBooking(serviceId){
   document.getElementById('bkServicePrice').textContent = `R$ ${svc.price}`;
   document.getElementById('bkTotal').textContent = `R$ ${svc.price}`;
 
+  const titleEl = document.getElementById('bkTitle');
+  if(titleEl) titleEl.textContent = editingBookingId ? 'Editar agendamento' : 'Agendamento';
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
+  if(cancelEditBtn) cancelEditBtn.style.display = editingBookingId ? 'block' : 'none';
+
   renderProfessionals();
   renderClientCal();
   renderSlots();
   updateConfirmBtn();
   showScreen('screen-booking');
+}
+// Chamado pelo link "Editar agendamento" em Meus horários — o cliente escolhe
+// o novo serviço/horário pela tela normal de agendamento; confirmBooking()
+// reconhece o modo edição e substitui o agendamento antigo pelo novo.
+function openEditBooking(id){
+  const b = myBookings.find(x => x.id === id);
+  if(!b) return;
+  editingBookingId = id;
+  toast('Escolha o novo serviço e horário');
+  showScreen('screen-home'); setNav('home');
+}
+function cancelEditBooking(){
+  editingBookingId = null;
+  showScreen('screen-appointments'); setNav('appointments'); renderAppointments();
+  toast('Edição cancelada');
 }
 
 function renderProfessionals(){
@@ -878,6 +976,7 @@ async function confirmBooking(){
   const btn = document.getElementById('confirmBtn');
   if(btn.disabled) return; // evita duplo-clique disparar duas reservas
   btn.disabled = true;
+  const wasEditing = editingBookingId;
   const payload = {
     serviceId: state.selectedService.id,
     profId: state.selectedProf,
@@ -888,7 +987,7 @@ async function confirmBooking(){
     payment: state.selectedPayment || 'Não informado',
     source: 'client'
   };
-  toast('Agendando...');
+  toast(wasEditing ? 'Salvando novo horário...' : 'Agendando...');
   const res = await apiPost('addBooking', payload);
   if(res.error){
     toast(res.error);
@@ -896,9 +995,22 @@ async function confirmBooking(){
     if(res.error.includes('reservado por outra pessoa')) renderSlots(); // atualiza a grade de horários
     return;
   }
+
+  if(wasEditing){
+    // Só cancela o agendamento antigo depois que o novo já foi criado com
+    // sucesso — assim o cliente nunca fica sem nenhum horário marcado se o
+    // novo der conflito ou falhar.
+    editingBookingId = null;
+    await apiPost('cancelBooking', { id: wasEditing, source: 'client', phone: state.userPhone });
+    bookings = bookings.filter(b => b.id !== wasEditing);
+    myBookings = myBookings.filter(b => b.id !== wasEditing);
+  }
+
   bookings.push({ id: res.id, serviceId: payload.serviceId, profId: payload.profId, date: payload.date, time: payload.time });
   myBookings.push({ id: res.id, ...payload });
 
+  const titleEl = document.getElementById('successModalTitle');
+  if(titleEl) titleEl.textContent = wasEditing ? 'Agendamento atualizado com sucesso!' : 'Agendamento realizado com sucesso!';
   document.getElementById('successModalDetails').innerHTML = `
     <div class="confirm-row"><span>Serviço</span><strong>${state.selectedService.name}</strong></div>
     <div class="confirm-row"><span>Profissional</span><strong>${prof.name}</strong></div>
@@ -941,7 +1053,7 @@ function renderAppointments(){
         </div>
         <div class="appt-status">Confirmado</div>
       </div>
-      ${canCancel ? `<div class="appt-actions"><button class="link-danger" onclick="cancelBooking(${b.id})">Cancelar agendamento</button></div>` : ''}
+      ${canCancel ? `<div class="appt-actions"><button class="link-text" onclick="openEditBooking(${b.id})">Editar agendamento</button><button class="link-danger" onclick="cancelBooking(${b.id})">Cancelar agendamento</button></div>` : ''}
     `;
   }).join('');
 }
@@ -2755,6 +2867,7 @@ async function init(){
   if(session){
     state.userName  = session.userName  || 'Cliente';
     state.userPhone = session.userPhone || null;
+    state.userPhoto = session.userPhoto || null;
     if(session.isAdmin){
       // enterAdmin() reconfirma o token com o servidor antes de liberar o painel —
       // um "isAdmin:true" sozinho no localStorage não basta (poderia ser forjado).

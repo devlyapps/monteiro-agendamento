@@ -451,8 +451,9 @@
   }
   .appt-side{display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex:none;}
   .appt-value{font-family:'Playfair Display',serif; color:var(--red-bright); font-size:1rem;}
-  .appt-actions{padding:0 22px; margin:-4px 0 18px;}
+  .appt-actions{padding:0 22px; margin:-4px 0 18px; display:flex; gap:18px;}
   .link-danger{background:none; border:none; color:var(--danger); font-size:.78rem; cursor:pointer; text-decoration:underline;}
+  .link-text{background:none; border:none; color:var(--muted); font-size:.78rem; cursor:pointer; text-decoration:underline;}
 
   /* ---------- CARTÃO FIDELIDADE ---------- */
   .loyalty-card{
@@ -596,6 +597,24 @@
   .share-actions .btn{ flex:1; }
 
   /* ---------- CARD CLIENTE ---------- */
+  .profile-edit-card{ padding:20px 22px 8px; }
+  .profile-avatar-wrap{
+    position:relative; width:88px; height:88px; border-radius:50%;
+    margin:0 auto 22px; cursor:pointer;
+  }
+  .profile-avatar-wrap img{ width:100%; height:100%; border-radius:50%; object-fit:cover; border:2px solid var(--red); }
+  .profile-avatar-placeholder{
+    width:100%; height:100%; border-radius:50%; background:var(--surface);
+    border:2px dashed var(--red-dim); color:var(--muted);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .profile-avatar-placeholder svg{ width:32px; height:32px; }
+  .profile-avatar-edit-badge{
+    position:absolute; bottom:0; right:0; width:26px; height:26px; border-radius:50%;
+    background:var(--red); color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:.75rem; border:2px solid var(--bg);
+  }
+
   .client-stats-row{display:flex; gap:10px; padding:0 22px 14px;}
   .client-stat-card{
     flex:1; text-align:center; padding:12px 8px; border-radius:var(--radius-sm);
