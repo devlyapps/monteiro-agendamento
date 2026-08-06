@@ -90,6 +90,13 @@
   }
   @keyframes spinY{ from{transform:rotateY(0deg);} to{transform:rotateY(360deg);} }
   .hero p.tag{font-size:.78rem; color:var(--red-bright); letter-spacing:.16em; text-transform:uppercase;}
+  .hero-admin-btn{
+    position:absolute; top:16px; right:16px; z-index:2;
+    background:rgba(22,22,22,.7); border:1px solid var(--red-dim); color:var(--muted);
+    font-size:.68rem; letter-spacing:.03em; padding:8px 13px; border-radius:999px;
+    cursor:pointer; backdrop-filter:blur(4px);
+  }
+  .hero-admin-btn:active{transform:scale(.97);}
 
   .hero-info{width:100%; max-width:300px; margin-top:6px; padding-top:18px; border-top:1px solid var(--red-dim);}
   .hero-line{display:flex; align-items:flex-start; gap:8px; font-size:.74rem; color:var(--muted); line-height:1.45; margin-bottom:9px; text-align:left;}

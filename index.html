@@ -26,6 +26,7 @@
   <!-- ============ LOGIN ============ -->
   <section class="screen active no-nav" id="screen-login">
     <div class="hero">
+      <button class="hero-admin-btn" onclick="showScreen('screen-admin-login')">Acesso profissional</button>
       <img class="logo-mark" src="logo-monteiro.jpeg" alt="Monteiro Barbearia">
       <p class="tag">Agendamento online</p>
 
@@ -62,8 +63,6 @@
       <p class="auth-foot">Esqueceu a senha?<button class="btn-text" onclick="requestPasswordRecovery()">Recuperar</button></p>
 
       <a href="manual-cliente.html" target="_blank" class="admin-link" style="color:var(--muted); margin-top:14px; display:none;">📖 Manual de uso</a>
-
-      <button class="admin-link" onclick="showScreen('screen-admin-login')">Acessar como administrador →</button>
     </div>
   </section>
 
@@ -478,6 +477,13 @@
 
       <div class="admin-day">
         <div class="field" style="margin-bottom:0;">
+          <label>Mês</label>
+          <select id="caixaMonthFilter" onchange="selectCaixaMonth(this.value)"></select>
+        </div>
+      </div>
+
+      <div class="admin-day">
+        <div class="field" style="margin-bottom:0;">
           <label>Colaborador</label>
           <select id="caixaProfFilter" onchange="renderCaixaList()"></select>
         </div>
@@ -486,12 +492,12 @@
       <div class="section-label" style="margin-top:18px;"><span id="caixaCount">Serviços do período:</span><div class="line"></div></div>
       <div class="service-list" id="caixaList"></div>
 
-      <div id="caixaByPayment" style="padding:0 22px; margin-top:10px;"></div>
-
       <div class="summary-chip" style="margin-top:6px;">
         <div><strong>Total no período</strong><p>Soma dos serviços validados no filtro</p></div>
         <b id="caixaTotal">R$ 0</b>
       </div>
+
+      <div id="caixaByPayment" style="padding:0 22px; margin-top:10px;"></div>
     </div>
 
     <!-- TAB: CLIENTES -->

@@ -2329,10 +2329,16 @@ async function renderClientesTab(){
 
   const q = (document.getElementById('clientSearch')?.value || '').toLowerCase().trim();
   let list = clientesCache;
-  if(q) list = list.filter(c =>
-    (c.name||'').toLowerCase().includes(q) ||
-    (c.phone||'').includes(q.replace(/\D/g,''))
-  );
+  if(q){
+    // Sem o `qDigits &&`, uma busca só com letras zerava os dígitos e virava
+    // string vazia — e toda string "contém" uma string vazia, então o filtro
+    // de telefone passava a bater com qualquer cliente, anulando a busca por nome.
+    const qDigits = q.replace(/\D/g,'');
+    list = list.filter(c =>
+      (c.name||'').toLowerCase().includes(q) ||
+      (qDigits && (c.phone||'').includes(qDigits))
+    );
+  }
 
   if(!list.length){
     wrap.innerHTML = `<div class="empty-note">Nenhum cliente encontrado.</div>`;
@@ -2447,6 +2453,7 @@ function caixaCalToday(){
   caixaCalMonth = new Date().getMonth();
   caixaRangeFrom = isoOffset(0);
   caixaRangeTo   = isoOffset(0);
+  resetCaixaMonthFilter();
   syncCaixaRangeInputs();
   renderCaixaCal();
   renderCaixaList();
@@ -2456,6 +2463,7 @@ function caixaCalToday(){
 function caixaCalSelectDay(iso){
   caixaRangeFrom = iso;
   caixaRangeTo   = iso;
+  resetCaixaMonthFilter();
   syncCaixaRangeInputs();
   renderCaixaCal();
   renderCaixaList();
@@ -2473,6 +2481,28 @@ function updateCaixaRange(){
   caixaRangeFrom = fromEl.value;
   caixaRangeTo   = toEl.value;
   if(caixaRangeFrom > caixaRangeTo){ [caixaRangeFrom, caixaRangeTo] = [caixaRangeTo, caixaRangeFrom]; syncCaixaRangeInputs(); }
+  resetCaixaMonthFilter();
+  renderCaixaCal();
+  renderCaixaList();
+}
+function resetCaixaMonthFilter(){
+  const el = document.getElementById('caixaMonthFilter');
+  if(el) el.value = '';
+}
+// Preenche o filtro de mês (Janeiro até o mês atual, no ano corrente) e aplica
+// o período de 1º ao último dia do mês escolhido.
+function selectCaixaMonth(value){
+  if(value === '') return; // "Período personalizado" — deixa o filtro atual como está
+  const month = Number(value);
+  const year  = new Date().getFullYear();
+  const first = new Date(year, month, 1);
+  const last  = new Date(year, month + 1, 0);
+  const toIso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  caixaRangeFrom = toIso(first);
+  caixaRangeTo   = toIso(last);
+  caixaCalYear   = year;
+  caixaCalMonth  = month;
+  syncCaixaRangeInputs();
   renderCaixaCal();
   renderCaixaList();
 }
@@ -2515,6 +2545,14 @@ function renderCaixaTab(){
   const profSelect = document.getElementById('caixaProfFilter');
   profSelect.innerHTML = `<option value="all">Todos os colaboradores</option>` +
     professionals.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  const monthSelect = document.getElementById('caixaMonthFilter');
+  if(monthSelect){
+    const nowMonth = new Date().getMonth();
+    let opts = `<option value="">Período personalizado</option>`;
+    for(let m = 0; m <= nowMonth; m++) opts += `<option value="${m}">${monthNames[m]}</option>`;
+    monthSelect.innerHTML = opts;
+    monthSelect.value = '';
+  }
   caixaCalYear  = new Date().getFullYear();
   caixaCalMonth = new Date().getMonth();
   caixaRangeFrom = isoOffset(0);
@@ -2583,12 +2621,14 @@ function renderCaixaList(){
       `;
     }).join('');
 
-    // Total separado por forma de pagamento (a que o cliente escolheu ao agendar)
-    const paymentIcons = { 'Pix': '💠', 'Crédito': '💳', 'Débito': '💳', 'Dinheiro': '💵' };
+    // Total separado por forma de pagamento (a que o cliente escolheu ao agendar).
+    // Crédito e Débito somam juntos em "Cartão" — o admin só quer ver essa divisão.
+    const paymentIcons = { 'Pix': '💠', 'Cartão': '💳', 'Dinheiro': '💵' };
     const byPayment = {};
     list.forEach(b => {
       const s = services.find(x => x.id === b.serviceId);
-      const method = b.payment || 'Não informado';
+      let method = b.payment || 'Não informado';
+      if(method === 'Crédito' || method === 'Débito') method = 'Cartão';
       byPayment[method] = (byPayment[method] || 0) + (s ? Number(s.price) : 0);
     });
     document.getElementById('caixaByPayment').innerHTML = Object.entries(byPayment).map(([method, sum]) => `
