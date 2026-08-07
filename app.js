@@ -427,9 +427,18 @@ function restoreSession(){
   } catch(e){ return false; }
 }
 
+// Guarda o logo padrão da barbearia (a imagem original do círculo no topo da
+// Home) pra poder restaurar quando o cliente não tem foto de perfil própria.
+const DEFAULT_HOME_AVATAR = document.getElementById('homeUserAvatar')?.src || '';
+function updateHomeAvatar(){
+  const img = document.getElementById('homeUserAvatar');
+  if(img) img.src = state.userPhoto || DEFAULT_HOME_AVATAR;
+}
+
 async function finishLogin(){
   state.loggedIn = true; state.isAdmin = false;
   document.getElementById('homeUserName').textContent = capitalize(state.userName.split(' ')[0]);
+  updateHomeAvatar();
   document.getElementById('navAdmin').style.display = 'none';
   renderCategoryChips(); renderServices();
   showScreen('screen-home'); setNav('home');
@@ -578,6 +587,7 @@ async function saveProfileInfo(){
   state.userName = name;
   if(profilePhotoData !== null){ state.userPhoto = profilePhotoData; profilePhotoData = null; }
   document.getElementById('homeUserName').textContent = capitalize(name.split(' ')[0]);
+  updateHomeAvatar();
   saveSession();
   toast('✅ Perfil atualizado!');
 }
@@ -2887,6 +2897,7 @@ async function init(){
     } else {
       state.loggedIn = true; state.isAdmin = false;
       document.getElementById('homeUserName').textContent = capitalize((state.userName||'').split(' ')[0]);
+      updateHomeAvatar();
       document.getElementById('navAdmin').style.display = 'none';
       renderCategoryChips(); renderServices();
       showScreen('screen-home'); setNav('home');
