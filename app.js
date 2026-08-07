@@ -768,27 +768,38 @@ function toHHmm(val){
   } catch(e){ return '00:00'; }
 }
 
-function generateSlots(dateIso, profId){
+function generateSlots(dateIso, profId, isAdmin){
   const dow = new Date(dateIso+'T00:00').getDay();
   const cfg = businessConfig.hours[dow];
-  if(!cfg || cfg.closed) return [];
 
-  const [oh,om] = toHHmm(cfg.open).split(':').map(Number);
-  const [ch,cm] = toHHmm(cfg.close).split(':').map(Number);
+  let blocks;
+  if(isAdmin){
+    // O admin pode lançar um agendamento manual fora do horário de funcionamento
+    // normal (dia fechado, antes de abrir, depois de fechar) — grade fixa das
+    // 06:00 às 23:59, no mesmo intervalo entre atendimentos já configurado.
+    // O cliente nunca vê isso: só as duas telas de agendamento manual do admin
+    // passam isAdmin=true.
+    blocks = [{ start: 6*60, end: 24*60 }];
+  } else {
+    if(!cfg || cfg.closed) return [];
 
-  // Define os blocos de atendimento
-  const blocks = [{ start: oh*60+om, end: ch*60+cm }];
-  const brk = businessConfig.breaks ? businessConfig.breaks[dow] : null;
-  if(brk && brk.active && brk.open2 && brk.close2){
-    // Com 2° período: o 1° bloco vai só até o início do 2° período
-    // O admin configura: open (abre), close (fecha 1° período) no "Dias e horários"
-    // E open2 (abre 2° período), close2 (fecha 2° período) no "Horários de atendimento"
-    const [o2h,o2m] = brk.open2.split(':').map(Number);
-    const [c2h,c2m] = brk.close2.split(':').map(Number);
-    // Ajusta o 1° bloco para terminar onde o admin definiu (close do dia)
-    // e adiciona o 2° bloco
-    blocks[0].end = oh*60+om < o2h*60+o2m ? Math.min(ch*60+cm, o2h*60+o2m) : ch*60+cm;
-    if(o2h*60+o2m < c2h*60+c2m) blocks.push({ start: o2h*60+o2m, end: c2h*60+c2m });
+    const [oh,om] = toHHmm(cfg.open).split(':').map(Number);
+    const [ch,cm] = toHHmm(cfg.close).split(':').map(Number);
+
+    // Define os blocos de atendimento
+    blocks = [{ start: oh*60+om, end: ch*60+cm }];
+    const brk = businessConfig.breaks ? businessConfig.breaks[dow] : null;
+    if(brk && brk.active && brk.open2 && brk.close2){
+      // Com 2° período: o 1° bloco vai só até o início do 2° período
+      // O admin configura: open (abre), close (fecha 1° período) no "Dias e horários"
+      // E open2 (abre 2° período), close2 (fecha 2° período) no "Horários de atendimento"
+      const [o2h,o2m] = brk.open2.split(':').map(Number);
+      const [c2h,c2m] = brk.close2.split(':').map(Number);
+      // Ajusta o 1° bloco para terminar onde o admin definiu (close do dia)
+      // e adiciona o 2° bloco
+      blocks[0].end = oh*60+om < o2h*60+o2m ? Math.min(ch*60+cm, o2h*60+o2m) : ch*60+cm;
+      if(o2h*60+o2m < c2h*60+c2m) blocks.push({ start: o2h*60+o2m, end: c2h*60+c2m });
+    }
   }
 
   const today  = isoOffset(0);
@@ -1948,7 +1959,7 @@ function renderDaySlotsBody(){
   const wrap = document.getElementById('daySlotsBody');
   if(!wrap || !daySlotsDate || !selectedAgendaStaff){ return; }
 
-  const slots = generateSlots(daySlotsDate, selectedAgendaStaff);
+  const slots = generateSlots(daySlotsDate, selectedAgendaStaff, true);
   if(!slots.length){
     wrap.innerHTML = `<div class="empty-note">Sem horários disponíveis neste dia (fechado ou bloqueado).</div>
       <button class="btn btn-ghost" style="margin-top:12px;" onclick="closeDaySlotsModal()">Fechar</button>`;
@@ -2296,7 +2307,7 @@ function renderAdminBookingSlots(){
   const wrap   = document.getElementById('abfSlots');
   if(!wrap) return;
   adminSelectedSlot = null;
-  const slots = generateSlots(date, profId);
+  const slots = generateSlots(date, profId, true);
   if(!slots.length){ wrap.innerHTML = `<div style="color:var(--muted); font-size:.8rem; grid-column:1/-1;">Nenhum slot disponível neste dia.</div>`; return; }
   wrap.innerHTML = slots.map(s => `
     <div class="slot ${s.available?'':'taken'}" id="abf-slot-${s.time.replace(':','-')}"
