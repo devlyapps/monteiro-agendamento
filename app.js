@@ -778,7 +778,7 @@ function toHHmm(val){
   } catch(e){ return '00:00'; }
 }
 
-function generateSlots(dateIso, profId, isAdmin){
+function generateSlots(dateIso, profId, isAdmin, excludeBookingId){
   const dow = new Date(dateIso+'T00:00').getDay();
   const cfg = businessConfig.hours[dow];
 
@@ -822,7 +822,10 @@ function generateSlots(dateIso, profId, isAdmin){
   // Monta um Set de todos os minutos ocupados por agendamentos existentes
   // levando em conta a duração de cada serviço já marcado
   const occupiedMins = new Set();
-  bookings.filter(b => b.profId === profId && b.date === dateIso).forEach(b => {
+  // excludeBookingId ignora o próprio agendamento sendo editado — senão o
+  // horário atual dele apareceria como "ocupado" por ele mesmo, impedindo o
+  // admin de deixar o agendamento no mesmo horário depois de editar outra coisa.
+  bookings.filter(b => b.profId === profId && b.date === dateIso && b.id !== excludeBookingId).forEach(b => {
     const booked = services.find(s => s.id === Number(b.serviceId));
     // Fallback pro intervalo padrão se o serviço não tiver duração válida
     // cadastrada (0, vazio etc) — senão o horário ocupado por ele não é
@@ -1928,7 +1931,10 @@ function renderAgendaApptList(){
                 </button>`
             }
             ${waLink ? `<button class="icon-btn small" onclick="event.stopPropagation(); openWhatsApp('${waLink}')" title="Enviar lembrete" style="color:#25D366;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg></button>` : ''}
-            <button class="icon-btn small danger" onclick="adminCancelBooking(${b.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
+            <button class="icon-btn small" onclick="event.stopPropagation(); openAdminEditBookingForm(${b.id})" title="Editar agendamento">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+            </button>
+            <button class="icon-btn small danger" onclick="event.stopPropagation(); adminCancelBooking(${b.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
           </div>
         </div>
       </div>`;
@@ -2202,26 +2208,38 @@ function removeBlockedRange(i){
 }
 
 /* ===================== AGENDAMENTO PELO ADMIN ===================== */
+// null = criando um agendamento novo; com valor = editando esse agendamento
+// existente (guarda o registro inteiro, não só o id, pra pré-preencher o form).
+let editingAdminBooking = null;
+
+function openAdminEditBookingForm(id){
+  const booking = bookings.find(b => b.id === id);
+  if(!booking) return;
+  editingAdminBooking = booking;
+  openAdminBookingForm();
+}
+
 function openAdminBookingForm(){
   const wrap = document.getElementById('adminBookingFormWrap');
   wrap.style.display = 'block';
   ensureClientsCacheLoaded().then(renderClientsDatalist);
+  const editing = editingAdminBooking;
   const today = isoOffset(0);
   wrap.innerHTML = `
     <div class="admin-inline-form" style="margin:0;">
-      <h3 style="font-size:.92rem; margin-bottom:14px;">Novo agendamento</h3>
-      <div class="field"><label>Nome do cliente</label><input id="abfName" type="text" placeholder="Nome completo" list="clientsDatalist" oninput="fillClientPhoneFromName(this.value,'abfPhone')"></div>
-      <div class="field"><label>Telefone (opcional)</label><input id="abfPhone" type="tel" placeholder="(11) 99999-9999" oninput="maskPhone(this)"></div>
+      <h3 style="font-size:.92rem; margin-bottom:14px;">${editing ? 'Editar agendamento' : 'Novo agendamento'}</h3>
+      <div class="field"><label>Nome do cliente</label><input id="abfName" type="text" placeholder="Nome completo" value="${editing ? escapeHtml(editing.clientName||'') : ''}" list="clientsDatalist" oninput="fillClientPhoneFromName(this.value,'abfPhone')"></div>
+      <div class="field"><label>Telefone (opcional)</label><input id="abfPhone" type="tel" placeholder="(11) 99999-9999" value="${editing ? formatPhoneBR(editing.clientPhone) : ''}" oninput="maskPhone(this)"></div>
       <div class="field">
         <label>Colaborador</label>
         <select id="abfProf" onchange="renderAdminBookingSlots()">
-          ${professionals.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+          ${professionals.map(p => `<option value="${p.id}" ${editing && editing.profId===p.id ? 'selected' : ''}>${p.name}</option>`).join('')}
         </select>
       </div>
-      <div class="field"><label>Data</label><input id="abfDate" type="date" value="${today}" onchange="renderAdminBookingSlots()"></div>
+      <div class="field"><label>Data</label><input id="abfDate" type="date" value="${editing ? editing.date : today}" onchange="renderAdminBookingSlots()"></div>
       <div class="field"><label>Serviço</label>
         <select id="abfService">
-          ${services.map(s => `<option value="${s.id}">${s.name} — R$ ${s.price}</option>`).join('')}
+          ${services.map(s => `<option value="${s.id}" ${editing && editing.serviceId===s.id ? 'selected' : ''}>${s.name} — R$ ${s.price}</option>`).join('')}
         </select>
       </div>
       <div class="field"><label>Horário disponível</label>
@@ -2229,14 +2247,15 @@ function openAdminBookingForm(){
       </div>
       <div class="field"><label>Pagamento</label>
         <select id="abfPayment">
-          <option value="Pix">Pix</option>
-          <option value="Crédito">Cartão Crédito</option>
-          <option value="Débito">Cartão Débito</option>
-          <option value="Dinheiro">Dinheiro</option>
+          <option value="Pix" ${editing && editing.payment==='Pix' ? 'selected' : ''}>Pix</option>
+          <option value="Crédito" ${editing && editing.payment==='Crédito' ? 'selected' : ''}>Cartão Crédito</option>
+          <option value="Débito" ${editing && editing.payment==='Débito' ? 'selected' : ''}>Cartão Débito</option>
+          <option value="Dinheiro" ${editing && editing.payment==='Dinheiro' ? 'selected' : ''}>Dinheiro</option>
         </select>
       </div>
 
-      <!-- BLOCO DE RECORRÊNCIA -->
+      ${editing ? '' : `
+      <!-- BLOCO DE RECORRÊNCIA (só faz sentido criando um agendamento novo) -->
       <div style="margin-top:18px; padding:14px 16px; background:rgba(196,60,45,.06); border:1px solid rgba(196,60,45,.2); border-radius:var(--radius-sm);">
         <div class="day-closed-wrap" style="margin-bottom:0;">
           <input type="checkbox" id="abfRepeat" onchange="toggleRepeatBlock(this.checked)">
@@ -2267,9 +2286,10 @@ function openAdminBookingForm(){
           <div id="abfRepeatPreview" style="font-size:.78rem; color:var(--muted); margin-top:8px; line-height:1.6;"></div>
         </div>
       </div>
+      `}
 
       <div style="display:flex; gap:10px; margin-top:16px;">
-        <button class="btn btn-green" style="flex:1;" onclick="saveAdminBooking(this)">Gravar agendamento</button>
+        <button class="btn btn-green" style="flex:1;" onclick="saveAdminBooking(this)">${editing ? 'Salvar alterações' : 'Gravar agendamento'}</button>
         <button class="btn btn-ghost" style="flex:1;" onclick="closeAdminBookingForm()">Cancelar</button>
       </div>
     </div>
@@ -2342,7 +2362,9 @@ function renderAdminBookingSlots(){
   const wrap   = document.getElementById('abfSlots');
   if(!wrap) return;
   adminSelectedSlot = null;
-  const slots = generateSlots(date, profId, true);
+  const editing = editingAdminBooking;
+  const excludeId = (editing && editing.profId === profId && editing.date === date) ? editing.id : null;
+  const slots = generateSlots(date, profId, true, excludeId);
   if(!slots.length){ wrap.innerHTML = `<div style="color:var(--muted); font-size:.8rem; grid-column:1/-1;">Nenhum slot disponível neste dia.</div>`; return; }
   wrap.innerHTML = slots.map(s => `
     <div class="slot ${s.available?'':'taken'}" id="abf-slot-${s.time.replace(':','-')}"
@@ -2350,6 +2372,12 @@ function renderAdminBookingSlots(){
       ${s.time}
     </div>
   `).join('');
+  // Ao editar, se ainda estiver no mesmo dia/profissional de antes, pré-seleciona
+  // o horário atual do agendamento (ele foi excluído do cálculo de ocupados acima).
+  if(excludeId !== null && editing.time){
+    const currentSlotEl = document.getElementById('abf-slot-'+editing.time.replace(':','-'));
+    if(currentSlotEl && currentSlotEl.classList.contains('taken') === false) selectAdminSlot(editing.time);
+  }
   // Atualiza preview de recorrência quando a data muda
   if(document.getElementById('abfRepeat')?.checked) updateRepeatPreview();
 }
@@ -2364,6 +2392,7 @@ function closeAdminBookingForm(){
   wrap.style.display = 'none';
   wrap.innerHTML = '';
   adminSelectedSlot = null;
+  editingAdminBooking = null;
 }
 async function saveAdminBooking(btnEl){
   const name      = document.getElementById('abfName').value.trim();
@@ -2378,6 +2407,42 @@ async function saveAdminBooking(btnEl){
   if(!date){ toast('Selecione a data'); return; }
   if(!adminSelectedSlot){ toast('Selecione um horário'); return; }
   if(btnEl?.disabled) return; // evita duplo-clique disparar duas reservas
+
+  if(editingAdminBooking){
+    const oldBooking = editingAdminBooking;
+    if(validatedBookingIds.has(String(oldBooking.id))){
+      const ok = confirm('Este agendamento já foi validado no cartão fidelidade.\n\nEditar vai cancelar o agendamento antigo e criar um novo — a validação desse atendimento será perdida (pode revalidar depois). Deseja continuar?');
+      if(!ok) return;
+    }
+    if(btnEl) btnEl.disabled = true;
+    toast('Salvando alterações...');
+    const res = await apiPost('addBooking', {
+      serviceId, profId, date, time: adminSelectedSlot,
+      clientName: name, clientPhone: phone, payment,
+      source: 'admin'
+    });
+    if(res.error){
+      toast(res.error);
+      if(btnEl) btnEl.disabled = false;
+      return;
+    }
+    // Só cancela o antigo depois que o novo já foi criado com sucesso — assim
+    // o cliente nunca fica sem nenhum horário se o novo der conflito ou falhar.
+    await apiPost('cancelBooking', { id: oldBooking.id, source: 'admin' });
+    bookings = bookings.filter(b => b.id !== oldBooking.id);
+    bookings.push({ id: res.id, serviceId, profId, date, time: adminSelectedSlot, clientName: name, clientPhone: phone, payment });
+
+    closeAdminBookingForm();
+    const editedDate = new Date(date+'T00:00');
+    agendaCalYear  = editedDate.getFullYear();
+    agendaCalMonth = editedDate.getMonth();
+    agendaSelectedDate = date;
+    selectedAgendaStaff = profId;
+    renderAgendaStaffChips();
+    renderAgendaApptList();
+    toast('✓ Agendamento atualizado!');
+    return;
+  }
   if(btnEl) btnEl.disabled = true;
 
   // Monta lista de datas: sempre inclui a data principal
