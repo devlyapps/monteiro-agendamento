@@ -1940,10 +1940,34 @@ function renderAgendaApptList(){
 let daySlotsDate = null;
 let daySlotsNewSlot = null;
 
+// Preenche a <datalist> usada pelos campos "Nome do cliente" do admin (Novo
+// Agendamento e Horários do dia) com os clientes já cadastrados, pra ele
+// escolher em vez de digitar de novo um cliente que já existe.
+async function ensureClientsCacheLoaded(){
+  if(clientesCache.length) return;
+  const res = await apiPost('getClients', {});
+  if(!res.error) clientesCache = Array.isArray(res) ? res : [];
+}
+function renderClientsDatalist(){
+  const dl = document.getElementById('clientsDatalist');
+  if(!dl) return;
+  dl.innerHTML = clientesCache.map(c => `<option value="${escapeHtml(c.name||'')}"></option>`).join('');
+}
+// Quando o nome digitado bate exatamente com um cliente já cadastrado, preenche
+// o telefone sozinho (só se o campo de telefone ainda estiver vazio, pra não
+// sobrescrever algo que o admin já tinha digitado manualmente).
+function fillClientPhoneFromName(nameVal, phoneInputId){
+  const match = clientesCache.find(c => (c.name||'').trim().toLowerCase() === nameVal.trim().toLowerCase());
+  if(!match) return;
+  const phoneEl = document.getElementById(phoneInputId);
+  if(phoneEl && !phoneEl.value) phoneEl.value = formatPhoneBR(match.phone);
+}
+
 function openDaySlots(iso){
   if(!selectedAgendaStaff) return;
   daySlotsDate = iso;
   daySlotsNewSlot = null;
+  ensureClientsCacheLoaded().then(renderClientsDatalist);
 
   const prof = professionals.find(p => p.id === selectedAgendaStaff);
   const ds = new Date(iso+'T00:00');
@@ -2036,7 +2060,7 @@ function renderDaySlotsForm(time){
   area.innerHTML = `
     <div class="day-slots-new-form">
       <h4>Agendar às ${time}</h4>
-      <div class="field"><label>Nome do cliente</label><input id="dsName" type="text" placeholder="Nome completo"></div>
+      <div class="field"><label>Nome do cliente</label><input id="dsName" type="text" placeholder="Nome completo" list="clientsDatalist" oninput="fillClientPhoneFromName(this.value,'dsPhone')"></div>
       <div class="field"><label>Telefone (opcional)</label><input id="dsPhone" type="tel" placeholder="(11) 99999-9999" oninput="maskPhone(this)"></div>
       <div class="field">
         <label>Serviço</label>
@@ -2181,11 +2205,12 @@ function removeBlockedRange(i){
 function openAdminBookingForm(){
   const wrap = document.getElementById('adminBookingFormWrap');
   wrap.style.display = 'block';
+  ensureClientsCacheLoaded().then(renderClientsDatalist);
   const today = isoOffset(0);
   wrap.innerHTML = `
     <div class="admin-inline-form" style="margin:0;">
       <h3 style="font-size:.92rem; margin-bottom:14px;">Novo agendamento</h3>
-      <div class="field"><label>Nome do cliente</label><input id="abfName" type="text" placeholder="Nome completo"></div>
+      <div class="field"><label>Nome do cliente</label><input id="abfName" type="text" placeholder="Nome completo" list="clientsDatalist" oninput="fillClientPhoneFromName(this.value,'abfPhone')"></div>
       <div class="field"><label>Telefone (opcional)</label><input id="abfPhone" type="tel" placeholder="(11) 99999-9999" oninput="maskPhone(this)"></div>
       <div class="field">
         <label>Colaborador</label>
