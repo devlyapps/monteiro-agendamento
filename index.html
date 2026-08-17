@@ -612,6 +612,24 @@
     </div>
   </div>
 
+  <!-- ============ MODAL EDITAR CLIENTE (ADMIN VIEW) ============ -->
+  <div class="loyalty-modal-overlay" id="editClientModalOverlay" onclick="closeEditClientModal(event)">
+    <div class="loyalty-modal-sheet">
+      <div class="loyalty-modal-handle"></div>
+      <div class="loyalty-modal-header">
+        <div><h3>Editar cliente</h3></div>
+        <button class="icon-btn" onclick="closeEditClientModalDirect()" style="flex:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div style="padding:0 22px 28px;">
+        <div class="field"><label>Nome</label><input id="editClientName" type="text" placeholder="Nome completo"></div>
+        <div class="field"><label>Número de celular</label><input id="editClientPhone" type="tel" inputmode="numeric" placeholder="(00) 00000-0000" maxlength="16" oninput="maskPhone(this)"></div>
+        <button class="btn btn-gold" onclick="saveClientContact()">Salvar alterações</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ MODAL HORÁRIOS DO DIA (ADMIN) ============ -->
   <div class="day-slots-overlay" id="daySlotsOverlay" onclick="closeDaySlots(event)">
     <div class="day-slots-sheet">
