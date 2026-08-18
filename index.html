@@ -614,6 +614,26 @@
 
   <datalist id="clientsDatalist"></datalist>
 
+  <!-- ============ MODAL EDITAR SERVIÇO/VALOR NO CAIXA (ADMIN VIEW) ============ -->
+  <div class="loyalty-modal-overlay" id="editCaixaModalOverlay" onclick="closeEditCaixaModal(event)">
+    <div class="loyalty-modal-sheet">
+      <div class="loyalty-modal-handle"></div>
+      <div class="loyalty-modal-header">
+        <div><h3>Editar serviço e valor</h3></div>
+        <button class="icon-btn" onclick="closeEditCaixaModalDirect()" style="flex:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div style="padding:0 22px 28px;">
+        <div class="field"><label>Serviço realizado</label>
+          <select id="editCaixaService" onchange="syncEditCaixaPrice()"></select>
+        </div>
+        <div class="field"><label>Valor cobrado (R$)</label><input id="editCaixaPrice" type="number" min="0" step="1"></div>
+        <button class="btn btn-gold" onclick="saveCaixaRecord()">Salvar alterações</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ MODAL EDITAR CLIENTE (ADMIN VIEW) ============ -->
   <div class="loyalty-modal-overlay" id="editClientModalOverlay" onclick="closeEditClientModal(event)">
     <div class="loyalty-modal-sheet">
@@ -644,6 +664,12 @@
         <button class="icon-btn" onclick="closeDaySlotsModal()" style="flex:none;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
+      </div>
+      <div style="padding:0 22px 12px;">
+        <div class="field" style="margin-bottom:0;">
+          <label>Serviço (define a duração usada na grade abaixo)</label>
+          <select id="daySlotsService" onchange="renderDaySlotsBody()"></select>
+        </div>
       </div>
       <div class="day-slots-body" id="daySlotsBody"></div>
     </div>

@@ -778,7 +778,7 @@ function toHHmm(val){
   } catch(e){ return '00:00'; }
 }
 
-function generateSlots(dateIso, profId, isAdmin, excludeBookingId){
+function generateSlots(dateIso, profId, isAdmin, excludeBookingId, serviceDurationParam){
   const dow = new Date(dateIso+'T00:00').getDay();
   const cfg = businessConfig.hours[dow];
 
@@ -839,8 +839,13 @@ function generateSlots(dateIso, profId, isAdmin, excludeBookingId){
     }
   });
 
-  // Duração do serviço que está sendo consultado agora (mesmo fallback do laço acima)
-  const selectedDur = state.selectedService ? Number(state.selectedService.duration) : NaN;
+  // Duração do serviço que está sendo consultado agora. Precisa vir explícita
+  // por parâmetro — antes essa função lia direto o state.selectedService global,
+  // que só é setado no fluxo de agendamento do CLIENTE. Nas telas do admin
+  // (Novo Agendamento, Horários do dia) esse state nunca é tocado, então a
+  // grade calculava disponibilidade com a duração errada (ou o intervalo padrão),
+  // deixando horários aparecerem como livres mesmo colidindo com outro atendimento.
+  const selectedDur = Number(serviceDurationParam);
   const serviceDuration = (selectedDur > 0) ? selectedDur : businessConfig.interval;
 
   for(const block of blocks){
@@ -969,7 +974,7 @@ function renderSlots(){
     wrap.innerHTML = `<div class="empty-note">Selecione um colaborador disponível para ver os horários.</div>`;
     return;
   }
-  const slots = generateSlots(state.selectedDate, state.selectedProf);
+  const slots = generateSlots(state.selectedDate, state.selectedProf, false, null, state.selectedService?.duration);
   if(!slots.length){
     wrap.innerHTML = `<div class="empty-note">Fechado neste dia. Escolha outra data.</div>`;
     return;
@@ -1321,13 +1326,7 @@ function renderPlanSlots(){
     wrap.innerHTML = `<div class="empty-note">Escolha o profissional e o dia primeiro.</div>`;
     return;
   }
-  // generateSlots lê state.selectedService pra saber a duração — troca temporariamente
-  // pelo combo do plano (seguro: o fluxo normal de agendamento sempre redefine
-  // state.selectedService do zero antes de usar, então não sobra "lixo" aqui).
-  const prevService = state.selectedService;
-  state.selectedService = planBookingState.comboService;
-  const slots = generateSlots(planBookingState.date, planBookingState.profId);
-  state.selectedService = prevService;
+  const slots = generateSlots(planBookingState.date, planBookingState.profId, false, null, planBookingState.comboService?.duration);
 
   if(!slots.length){
     wrap.innerHTML = `<div class="empty-note">Fechado nesse dia. Escolha outro.</div>`;
@@ -1360,13 +1359,11 @@ function getPlanWeekDatesIso(){
 // (só descobriria com o erro do servidor ao confirmar, ou nem isso).
 function getPlanWeekConflicts(){
   if(!planBookingState.date || !planBookingState.slot || !planBookingState.profId) return [];
-  const prevService = state.selectedService;
-  state.selectedService = planBookingState.comboService;
+  const dur = planBookingState.comboService?.duration;
   const conflicts = getPlanWeekDatesIso().map(iso => {
-    const slot = generateSlots(iso, planBookingState.profId).find(s => s.time === planBookingState.slot);
+    const slot = generateSlots(iso, planBookingState.profId, false, null, dur).find(s => s.time === planBookingState.slot);
     return !slot || !slot.available;
   });
-  state.selectedService = prevService;
   return conflicts;
 }
 function renderPlanDatesPreview(){
@@ -1981,6 +1978,16 @@ function openDaySlots(iso){
 
   document.getElementById('daySlotsTitle').textContent = dateLabel;
   document.getElementById('daySlotsSubtitle').textContent = prof ? prof.name : '';
+
+  // Serviço usado só pra saber a duração ao montar a grade abaixo — sem isso,
+  // a grade não tem como saber quanto tempo o próximo atendimento vai ocupar.
+  const svcSelect = document.getElementById('daySlotsService');
+  if(svcSelect){
+    const eligible = prof ? services.filter(s => Array.isArray(prof.serviceIds) && prof.serviceIds.includes(s.id)) : services;
+    const list = eligible.length ? eligible : services;
+    svcSelect.innerHTML = list.map(s => `<option value="${s.id}">${s.name} — ${s.duration} min</option>`).join('');
+  }
+
   document.getElementById('daySlotsOverlay').classList.add('show');
   renderDaySlotsBody();
 }
@@ -1999,7 +2006,9 @@ function renderDaySlotsBody(){
   const wrap = document.getElementById('daySlotsBody');
   if(!wrap || !daySlotsDate || !selectedAgendaStaff){ return; }
 
-  const slots = generateSlots(daySlotsDate, selectedAgendaStaff, true);
+  const svcId = Number(document.getElementById('daySlotsService')?.value);
+  const svc = services.find(s => s.id === svcId);
+  const slots = generateSlots(daySlotsDate, selectedAgendaStaff, true, null, svc?.duration);
   if(!slots.length){
     wrap.innerHTML = `<div class="empty-note">Sem horários disponíveis neste dia (fechado ou bloqueado).</div>
       <button class="btn btn-ghost" style="margin-top:12px;" onclick="closeDaySlotsModal()">Fechar</button>`;
@@ -2063,6 +2072,10 @@ function selectDaySlotForBooking(time){
 function renderDaySlotsForm(time){
   const area = document.getElementById('daySlotsFormArea');
   if(!area) return;
+  // Começa com o mesmo serviço escolhido lá em cima (o que definiu a grade) —
+  // o admin ainda pode trocar aqui, mas se trocar por um com duração maior
+  // que não cabe mais nesse horário, o servidor recusa ao confirmar.
+  const preselected = document.getElementById('daySlotsService')?.value;
   area.innerHTML = `
     <div class="day-slots-new-form">
       <h4>Agendar às ${time}</h4>
@@ -2071,7 +2084,7 @@ function renderDaySlotsForm(time){
       <div class="field">
         <label>Serviço</label>
         <select id="dsService">
-          ${services.map(s => `<option value="${s.id}">${s.name} — R$ ${s.price}</option>`).join('')}
+          ${services.map(s => `<option value="${s.id}" ${String(s.id)===String(preselected)?'selected':''}>${s.name} — R$ ${s.price} (${s.duration} min)</option>`).join('')}
         </select>
       </div>
       <div class="field">
@@ -2238,8 +2251,8 @@ function openAdminBookingForm(){
       </div>
       <div class="field"><label>Data</label><input id="abfDate" type="date" value="${editing ? editing.date : today}" onchange="renderAdminBookingSlots()"></div>
       <div class="field"><label>Serviço</label>
-        <select id="abfService">
-          ${services.map(s => `<option value="${s.id}" ${editing && editing.serviceId===s.id ? 'selected' : ''}>${s.name} — R$ ${s.price}</option>`).join('')}
+        <select id="abfService" onchange="renderAdminBookingSlots()">
+          ${services.map(s => `<option value="${s.id}" ${editing && editing.serviceId===s.id ? 'selected' : ''}>${s.name} — R$ ${s.price} (${s.duration} min)</option>`).join('')}
         </select>
       </div>
       <div class="field"><label>Horário disponível</label>
@@ -2359,12 +2372,14 @@ let adminSelectedSlot = null;
 function renderAdminBookingSlots(){
   const profId = Number(document.getElementById('abfProf')?.value);
   const date   = document.getElementById('abfDate')?.value;
+  const serviceId = Number(document.getElementById('abfService')?.value);
+  const svc = services.find(s => s.id === serviceId);
   const wrap   = document.getElementById('abfSlots');
   if(!wrap) return;
   adminSelectedSlot = null;
   const editing = editingAdminBooking;
   const excludeId = (editing && editing.profId === profId && editing.date === date) ? editing.id : null;
-  const slots = generateSlots(date, profId, true, excludeId);
+  const slots = generateSlots(date, profId, true, excludeId, svc?.duration);
   if(!slots.length){ wrap.innerHTML = `<div style="color:var(--muted); font-size:.8rem; grid-column:1/-1;">Nenhum slot disponível neste dia.</div>`; return; }
   wrap.innerHTML = slots.map(s => `
     <div class="slot ${s.available?'':'taken'}" id="abf-slot-${s.time.replace(':','-')}"
@@ -2912,6 +2927,15 @@ function renderCaixaTab(){
   renderCaixaCal();
   renderCaixaList();
 }
+// Valor cobrado de um agendamento: usa o "actualPrice" (definido manualmente pelo
+// admin ao editar, ex: desconto ou servico diferente do que foi agendado) quando
+// existir; senão cai no preço de tabela do serviço.
+function bookingPrice(b){
+  if(b.actualPrice !== undefined && b.actualPrice !== null && b.actualPrice !== '') return Number(b.actualPrice);
+  const s = services.find(x => x.id === b.serviceId);
+  return s ? Number(s.price) : 0;
+}
+
 function renderCaixaList(){
   const profId = document.getElementById('caixaProfFilter') ? document.getElementById('caixaProfFilter').value : 'all';
   // Só entra na Caixa o que foi validado pelo barbeiro (visita confirmada = serviço pago).
@@ -2961,7 +2985,10 @@ function renderCaixaList(){
             <p>${s ? s.name : 'Serviço'} · ${p ? p.name : '—'} · ${dateLabel} · ${timeStr || '—'}</p>
             ${payLabel ? `<p style="color:var(--green-bright); font-size:.8rem; margin-top:2px;">${payLabel}</p>` : ''}
           </div>
-          <div class="service-price"><strong>R$ ${s ? s.price : 0}</strong></div>
+          <div class="service-price"><strong>R$ ${bookingPrice(b)}</strong></div>
+          <button class="icon-btn small" onclick="openEditCaixaModal(${b.id})" title="Editar serviço/valor">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+          </button>
           ${waLink ? `<button class="icon-btn small" onclick="openWhatsApp('${waLink}')" title="Enviar lembrete via WhatsApp" style="color:#25D366;">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.505A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.652-.513-5.168-1.407l-.371-.22-3.762.894.952-3.653-.242-.386A9.94 9.94 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
           </button>` : ''}
@@ -2977,10 +3004,9 @@ function renderCaixaList(){
     const paymentIcons = { 'Pix': '💠', 'Cartão': '💳', 'Dinheiro': '💵' };
     const byPayment = {};
     list.forEach(b => {
-      const s = services.find(x => x.id === b.serviceId);
       let method = b.payment || 'Não informado';
       if(method === 'Crédito' || method === 'Débito') method = 'Cartão';
-      byPayment[method] = (byPayment[method] || 0) + (s ? Number(s.price) : 0);
+      byPayment[method] = (byPayment[method] || 0) + bookingPrice(b);
     });
     document.getElementById('caixaByPayment').innerHTML = Object.entries(byPayment).map(([method, sum]) => `
       <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--red-dim); font-size:.85rem;">
@@ -2990,11 +3016,46 @@ function renderCaixaList(){
     `).join('');
   }
 
-  const total = list.reduce((sum, b) => {
-    const s = services.find(x => x.id === b.serviceId);
-    return sum + (s ? s.price : 0);
-  }, 0);
+  const total = list.reduce((sum, b) => sum + bookingPrice(b), 0);
   document.getElementById('caixaTotal').textContent = `R$ ${total}`;
+}
+
+/* ===================== ADMIN · EDITAR SERVIÇO/VALOR NO CAIXA ===================== */
+let editCaixaBookingId = null;
+function openEditCaixaModal(id){
+  const b = bookings.find(x => x.id === id);
+  if(!b) return;
+  editCaixaBookingId = id;
+  const sel = document.getElementById('editCaixaService');
+  sel.innerHTML = services.map(s => `<option value="${s.id}">${s.name} — R$ ${s.price}</option>`).join('');
+  sel.value = b.serviceId;
+  document.getElementById('editCaixaPrice').value = bookingPrice(b);
+  document.getElementById('editCaixaModalOverlay').classList.add('show');
+}
+// Ao trocar o serviço, sugere o preço de tabela dele — mas o admin ainda pode
+// digitar um valor diferente antes de salvar (desconto, cobrança combinada, etc).
+function syncEditCaixaPrice(){
+  const svc = services.find(s => s.id === Number(document.getElementById('editCaixaService').value));
+  document.getElementById('editCaixaPrice').value = svc ? svc.price : 0;
+}
+function closeEditCaixaModalDirect(){
+  document.getElementById('editCaixaModalOverlay').classList.remove('show');
+}
+function closeEditCaixaModal(e){
+  if(e.target === document.getElementById('editCaixaModalOverlay')) closeEditCaixaModalDirect();
+}
+async function saveCaixaRecord(){
+  const serviceId = Number(document.getElementById('editCaixaService').value);
+  const actualPrice = Number(document.getElementById('editCaixaPrice').value);
+  if(!(actualPrice >= 0)){ toast('Informe um valor válido'); return; }
+  toast('Salvando...');
+  const res = await apiPost('updateBookingRecord', { id: editCaixaBookingId, serviceId, actualPrice });
+  if(res.error){ toast('Erro: ' + res.error); return; }
+  const b = bookings.find(x => x.id === editCaixaBookingId);
+  if(b){ b.serviceId = serviceId; b.actualPrice = actualPrice; }
+  closeEditCaixaModalDirect();
+  toast('✅ Atualizado!');
+  renderCaixaList();
 }
 
 /* ===================== INIT ===================== */
