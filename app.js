@@ -686,23 +686,83 @@ function togglePlanDetails(id){
     btn.classList.toggle('open', isOpen);
     btn.querySelector('span').textContent = isOpen ? 'Ocultar detalhes' : 'Ver detalhes e valor';
   });
-  updatePlansMarqueePause();
 }
-function updatePlansMarqueePause(){
-  const track = document.getElementById('plansTrack');
-  if(!track) return;
-  track.classList.toggle('paused', !!document.querySelector('.plan-details.open'));
-}
+// Esteira animada via rAF (em vez de CSS animation) pra permitir arraste manual:
+// o cliente pode puxar o card pra escolher o plano, e o avanço automático
+// retoma sozinho depois de alguns segundos parado.
+let plansMarqueeRaf = null;
 function initPlansMarquee(){
+  if(plansMarqueeRaf) cancelAnimationFrame(plansMarqueeRaf);
   const row = document.getElementById('plansRow');
   const track = document.getElementById('plansTrack');
   if(!row || !track) return;
-  const pause = () => track.classList.add('paused');
-  const resume = () => { if(!document.querySelector('.plan-details.open')) track.classList.remove('paused'); };
-  row.onmouseenter = pause;
-  row.onmouseleave = resume;
-  row.ontouchstart = pause;
-  row.ontouchend = resume;
+
+  const SPEED = 22; // px/segundo
+  const RESUME_DELAY = 2600; // ms parado até a esteira voltar a andar sozinha
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let halfWidth = track.scrollWidth / 2;
+  let position = 0;
+  let lastTs = null;
+  let autoAdvance = !reduceMotion;
+  let dragging = false, dragMoved = false, dragStartX = 0, dragStartPos = 0;
+  let resumeTimer = null;
+
+  const wrap = v => halfWidth > 0 ? ((v % halfWidth) + halfWidth) % halfWidth : 0;
+  const applyTransform = () => { track.style.transform = `translateX(${-position}px)`; };
+
+  function tick(ts){
+    if(lastTs === null) lastTs = ts;
+    const dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    if(autoAdvance && !dragging && !document.querySelector('.plan-details.open')){
+      position = wrap(position + SPEED * dt);
+      applyTransform();
+    }
+    plansMarqueeRaf = requestAnimationFrame(tick);
+  }
+  plansMarqueeRaf = requestAnimationFrame(tick);
+
+  const scheduleResume = () => {
+    clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(() => { autoAdvance = true; }, RESUME_DELAY);
+  };
+
+  track.addEventListener('pointerdown', e => {
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    dragging = true; dragMoved = false;
+    autoAdvance = false;
+    clearTimeout(resumeTimer);
+    dragStartX = e.clientX;
+    dragStartPos = position;
+    track.classList.add('dragging');
+    track.setPointerCapture(e.pointerId);
+  });
+  track.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const dx = e.clientX - dragStartX;
+    if(Math.abs(dx) > 4) dragMoved = true;
+    position = wrap(dragStartPos - dx);
+    applyTransform();
+  });
+  const endDrag = e => {
+    if(!dragging) return;
+    dragging = false;
+    track.classList.remove('dragging');
+    try{ track.releasePointerCapture(e.pointerId); }catch(err){}
+    if(!document.querySelector('.plan-details.open')) scheduleResume();
+    if(dragMoved){
+      const cancelClick = ev => { ev.stopPropagation(); ev.preventDefault(); };
+      track.addEventListener('click', cancelClick, { capture:true, once:true });
+    }
+  };
+  track.addEventListener('pointerup', endDrag);
+  track.addEventListener('pointercancel', endDrag);
+
+  row.addEventListener('mouseenter', () => { autoAdvance = false; clearTimeout(resumeTimer); });
+  row.addEventListener('mouseleave', () => { if(!dragging && !document.querySelector('.plan-details.open')) scheduleResume(); });
+
+  window.addEventListener('resize', () => { halfWidth = track.scrollWidth / 2; });
 }
 
 function renderServices(){

@@ -56,7 +56,6 @@
     .screen.active{animation:none;}
     .logo-mark{animation:none;}
     .shell{animation:none;}
-    .plans-track{animation:none;}
   }
 
   /* ---------- topbar (internal screens) ---------- */
@@ -217,9 +216,9 @@
   }
   .plans-row::before{left:0; background:linear-gradient(90deg, var(--bg) 0%, transparent 100%);}
   .plans-row::after{right:0; background:linear-gradient(270deg, var(--bg) 0%, transparent 100%);}
-  .plans-track{display:flex; gap:14px; width:max-content; animation:plans-marquee 34s linear infinite;}
-  .plans-track.paused{animation-play-state:paused;}
-  @keyframes plans-marquee{from{transform:translateX(-50%);} to{transform:translateX(0);}}
+  .plans-track{display:flex; gap:14px; width:max-content; cursor:grab; touch-action:pan-y;}
+  .plans-track.dragging{cursor:grabbing;}
+  .plans-track .plan-card{-webkit-user-drag:none; user-select:none;}
   .plan-card{
     flex:none; width:78vw; max-width:320px;
     background:linear-gradient(165deg, var(--surface) 0%, #100d0c 100%);
