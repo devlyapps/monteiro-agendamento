@@ -21,13 +21,13 @@
 </head>
 <body>
 
-<div class="shell" id="shell">
+<div class="shell" id="shell" transition-style="in:circle:hesitate">
 
   <!-- ============ LOGIN ============ -->
   <section class="screen active no-nav" id="screen-login">
     <div class="hero">
       <button class="hero-admin-btn" onclick="showScreen('screen-admin-login')">Acesso profissional</button>
-      <img class="logo-mark" src="logo-monteiro.jpeg" alt="Monteiro Barbearia" transition-style="in:circle:hesitate">
+      <img class="logo-mark" src="logo-monteiro.jpeg" alt="Monteiro Barbearia">
       <p class="tag">Agendamento online</p>
 
       <div class="hero-info">
@@ -39,6 +39,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.36 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.34 1.85.57 2.81.7A2 2 0 0122 16.92z"/></svg>
           (19) 99459-0300
         </p>
+        <div class="hero-hours-toggle" id="heroHoursToggle" onclick="toggleHeroHours()">
+          <span>Horário</span>
+          <svg class="hero-hours-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
         <div class="hero-hours" id="heroHours"></div>
       </div>
     </div>

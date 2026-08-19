@@ -39,6 +39,12 @@
     position:relative;
     overflow-x:hidden;
     box-shadow:0 0 60px rgba(0,0,0,.6);
+    animation:circle-in-hesitate 2.5s cubic-bezier(.25, 1, .30, 1) both;
+  }
+  @keyframes circle-in-hesitate{
+    0%{ clip-path:circle(0%); }
+    40%{ clip-path:circle(40%); }
+    100%{ clip-path:circle(125%); }
   }
 
   /* ---------- screens ---------- */
@@ -49,6 +55,7 @@
   @media (prefers-reduced-motion: reduce){
     .screen.active{animation:none;}
     .logo-mark{animation:none;}
+    .shell{animation:none;}
   }
 
   /* ---------- topbar (internal screens) ---------- */
@@ -86,14 +93,9 @@
   .logo-mark{
     width:172px; height:172px; border-radius:50%; object-fit:cover;
     border:2px solid var(--red); box-shadow:0 0 0 6px rgba(196,60,45,.12), 0 18px 40px rgba(0,0,0,.5);
-    animation:spinY 11s linear infinite, circle-in-hesitate 2.5s cubic-bezier(.25, 1, .30, 1) both;
+    animation:spinY 11s linear infinite;
   }
   @keyframes spinY{ from{transform:rotateY(0deg);} to{transform:rotateY(360deg);} }
-  @keyframes circle-in-hesitate{
-    0%{ clip-path:circle(0%); }
-    40%{ clip-path:circle(40%); }
-    100%{ clip-path:circle(125%); }
-  }
   .hero p.tag{font-size:.78rem; color:var(--red-bright); letter-spacing:.16em; text-transform:uppercase;}
   .hero-admin-btn{
     position:absolute; top:16px; right:16px; z-index:2;
@@ -108,7 +110,15 @@
   .hero-link{color:var(--muted); text-decoration:underline; text-underline-offset:2px; text-decoration-color:var(--red-dim);}
   .hero-link:active{color:var(--red-bright);}
   .hero-line svg{width:14px; height:14px; flex:none; margin-top:2px; color:var(--red-bright);}
-  .hero-hours{margin-top:12px;}
+  .hero-hours-toggle{
+    display:flex; align-items:center; justify-content:space-between;
+    cursor:pointer; margin-top:14px; padding:2px 0;
+    font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.1em;
+  }
+  .hero-hours-chevron{width:15px; height:15px; flex:none; transition:transform .25s ease;}
+  .hero-hours-toggle.open .hero-hours-chevron{transform:rotate(180deg);}
+  .hero-hours{margin-top:0; max-height:0; overflow:hidden; transition:max-height .35s ease;}
+  .hero-hours.open{margin-top:8px; max-height:300px;}
   .hero-hours-row{display:flex; justify-content:space-between; gap:10px; font-size:.72rem; padding:3px 0; color:var(--muted);}
   .hero-hours-row span:first-child{color:var(--cream); text-transform:capitalize;}
 

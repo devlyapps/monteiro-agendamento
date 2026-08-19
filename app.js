@@ -187,6 +187,14 @@ function renderHeroHours(){
     return `<div class="hero-hours-row"><span>${weekdayFull[dow]}</span><span>${label}</span></div>`;
   }).join('');
 }
+// Horário começa fechado na tela de login; o cliente expande clicando.
+function toggleHeroHours(){
+  const wrap = document.getElementById('heroHours');
+  const toggle = document.getElementById('heroHoursToggle');
+  if(!wrap || !toggle) return;
+  const isOpen = wrap.classList.toggle('open');
+  toggle.classList.toggle('open', isOpen);
+}
 
 /* ===================== HELPERS ===================== */
 function isoOffset(days){
