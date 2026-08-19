@@ -759,8 +759,19 @@ function initPlansMarquee(){
   track.addEventListener('pointerup', endDrag);
   track.addEventListener('pointercancel', endDrag);
 
-  row.addEventListener('mouseenter', () => { autoAdvance = false; clearTimeout(resumeTimer); });
-  row.addEventListener('mouseleave', () => { if(!dragging && !document.querySelector('.plan-details.open')) scheduleResume(); });
+  // pointerenter/leave em vez de mouseenter/leave: no toque (celular), o navegador
+  // dispara um "mouseenter" sintético sem o "mouseleave" correspondente garantido,
+  // o que travava a esteira pausada pra sempre no primeiro toque. Filtrando por
+  // pointerType==='mouse' isso só pausa em hover de mouse de verdade (desktop).
+  row.addEventListener('pointerenter', e => {
+    if(e.pointerType !== 'mouse') return;
+    autoAdvance = false;
+    clearTimeout(resumeTimer);
+  });
+  row.addEventListener('pointerleave', e => {
+    if(e.pointerType !== 'mouse') return;
+    if(!dragging && !document.querySelector('.plan-details.open')) scheduleResume();
+  });
 
   window.addEventListener('resize', () => { halfWidth = track.scrollWidth / 2; });
 }
