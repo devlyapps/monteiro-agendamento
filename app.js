@@ -1144,7 +1144,7 @@ async function confirmBooking(){
     myBookings = myBookings.filter(b => b.id !== wasEditing);
   }
 
-  bookings.push({ id: res.id, serviceId: payload.serviceId, profId: payload.profId, date: payload.date, time: payload.time });
+  bookings.push({ id: res.id, ...payload });
   myBookings.push({ id: res.id, ...payload });
 
   const titleEl = document.getElementById('successModalTitle');
@@ -1521,8 +1521,9 @@ async function confirmPlanBooking(){
     return;
   }
   (res.dates || []).forEach((d, i) => {
-    bookings.push({ id: res.ids[i], serviceId: comboService.id, profId, date: d, time: slot });
-    myBookings.push({ id: res.ids[i], serviceId: comboService.id, profId, date: d, time: slot, clientName: state.userName, clientPhone: state.userPhone, payment: `Plano ${plan.name}` });
+    const rec = { id: res.ids[i], serviceId: comboService.id, profId, date: d, time: slot, clientName: state.userName, clientPhone: state.userPhone, payment: `Plano ${plan.name}` };
+    bookings.push(rec);
+    myBookings.push(rec);
   });
   toast(`✅ 4 semanas reservadas! Finalize o pagamento a seguir.`, 3500);
   // Horários já garantidos — agora sim mostra o Pix pra concluir o pagamento.
@@ -2099,6 +2100,19 @@ function openDaySlots(iso){
 
   document.getElementById('daySlotsOverlay').classList.add('show');
   renderDaySlotsBody();
+  refreshAdminBookings(renderDaySlotsBody);
+}
+
+// Reconsulta os agendamentos no servidor e reprocessa a grade em seguida —
+// sem isso, se o admin ficar com o painel aberto e um cliente agendar nesse
+// meio-tempo, a grade de horários continua usando os dados carregados no
+// login do admin e mostra o horário como livre mesmo já estando ocupado.
+async function refreshAdminBookings(rerenderFn){
+  try{
+    const res = await apiPost('getAdminBookings', {});
+    if(!res.error) bookings = res.bookings;
+  }catch(e){}
+  rerenderFn();
 }
 
 function closeDaySlotsModal(){
@@ -2418,6 +2432,7 @@ function openAdminBookingForm(){
   `;
   renderAdminBookingSlots();
   wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+  refreshAdminBookings(renderAdminBookingSlots);
 }
 
 function toggleRepeatBlock(active){
