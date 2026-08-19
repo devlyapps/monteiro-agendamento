@@ -645,16 +645,16 @@ const SERVICE_PLANS = [
 function renderServicePlans(){
   const wrap = document.getElementById('plansRow');
   if(!wrap) return;
-  wrap.innerHTML = SERVICE_PLANS.map(p => `
+  const cardHTML = p => `
     <div class="plan-card" style="--plan-accent:${p.accent}; --plan-accent-dim:${p.accentDim};">
       <div class="plan-card-top">
         <img class="plan-badge-img" src="${p.img}" alt="Selo do plano ${p.name}" loading="lazy">
       </div>
-      <button class="plan-toggle" id="planToggle-${p.id}" onclick="togglePlanDetails('${p.id}')">
+      <button class="plan-toggle" data-plan-toggle="${p.id}" onclick="togglePlanDetails('${p.id}')">
         <span>Ver detalhes e valor</span>
         <svg class="plan-toggle-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
       </button>
-      <div class="plan-details" id="planDetails-${p.id}">
+      <div class="plan-details" data-plan-details="${p.id}">
         <div class="plan-heading">
           <span class="plan-name">${p.name}</span>
           <span class="plan-price">R$ ${p.price}<small> /mês</small></span>
@@ -667,17 +667,42 @@ function renderServicePlans(){
         <button class="plan-cta" onclick="startPlanBooking('${p.id}')">Quero esse plano</button>
       </div>
     </div>
-  `).join('');
+  `;
+  // Cartões duplicados formam a esteira: ao deslizar -50% ela volta ao início sem "pulo" visível.
+  const cardsHTML = SERVICE_PLANS.map(cardHTML).join('');
+  wrap.innerHTML = `<div class="plans-track" id="plansTrack">${cardsHTML}${cardsHTML}</div>`;
+  initPlansMarquee();
 }
 // Cada card de plano começa mostrando só o selo — o cliente expande pra ver
 // os serviços incluídos, o valor e o botão de contratar.
+// Como os cards existem em duplicidade (esteira infinita), usamos data-attributes
+// e querySelectorAll pra manter as duas cópias de um mesmo plano sincronizadas.
 function togglePlanDetails(id){
-  const details = document.getElementById('planDetails-'+id);
-  const toggle = document.getElementById('planToggle-'+id);
-  if(!details || !toggle) return;
-  const isOpen = details.classList.toggle('open');
-  toggle.classList.toggle('open', isOpen);
-  toggle.querySelector('span').textContent = isOpen ? 'Ocultar detalhes' : 'Ver detalhes e valor';
+  const anyDetails = document.querySelector(`[data-plan-details="${id}"]`);
+  if(!anyDetails) return;
+  const isOpen = !anyDetails.classList.contains('open');
+  document.querySelectorAll(`[data-plan-details="${id}"]`).forEach(el => el.classList.toggle('open', isOpen));
+  document.querySelectorAll(`[data-plan-toggle="${id}"]`).forEach(btn => {
+    btn.classList.toggle('open', isOpen);
+    btn.querySelector('span').textContent = isOpen ? 'Ocultar detalhes' : 'Ver detalhes e valor';
+  });
+  updatePlansMarqueePause();
+}
+function updatePlansMarqueePause(){
+  const track = document.getElementById('plansTrack');
+  if(!track) return;
+  track.classList.toggle('paused', !!document.querySelector('.plan-details.open'));
+}
+function initPlansMarquee(){
+  const row = document.getElementById('plansRow');
+  const track = document.getElementById('plansTrack');
+  if(!row || !track) return;
+  const pause = () => track.classList.add('paused');
+  const resume = () => { if(!document.querySelector('.plan-details.open')) track.classList.remove('paused'); };
+  row.onmouseenter = pause;
+  row.onmouseleave = resume;
+  row.ontouchstart = pause;
+  row.ontouchend = resume;
 }
 
 function renderServices(){
