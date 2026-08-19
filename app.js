@@ -649,19 +649,35 @@ function renderServicePlans(){
     <div class="plan-card" style="--plan-accent:${p.accent}; --plan-accent-dim:${p.accentDim};">
       <div class="plan-card-top">
         <img class="plan-badge-img" src="${p.img}" alt="Selo do plano ${p.name}" loading="lazy">
+      </div>
+      <button class="plan-toggle" id="planToggle-${p.id}" onclick="togglePlanDetails('${p.id}')">
+        <span>Ver detalhes e valor</span>
+        <svg class="plan-toggle-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="plan-details" id="planDetails-${p.id}">
         <div class="plan-heading">
           <span class="plan-name">${p.name}</span>
           <span class="plan-price">R$ ${p.price}<small> /mês</small></span>
         </div>
+        <ul class="plan-checklist">
+          ${p.services.map(s => `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>${s}</li>`).join('')}
+        </ul>
+        <p class="plan-freq">Podendo cortar 1x por semana (4x no mês) · Terça a Sexta</p>
+        <div class="plan-warning">⚠️ Marcou e não veio, perde o dia da semana.</div>
+        <button class="plan-cta" onclick="startPlanBooking('${p.id}')">Quero esse plano</button>
       </div>
-      <ul class="plan-checklist">
-        ${p.services.map(s => `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>${s}</li>`).join('')}
-      </ul>
-      <p class="plan-freq">Podendo cortar 1x por semana (4x no mês) · Terça a Sexta</p>
-      <div class="plan-warning">⚠️ Marcou e não veio, perde o dia da semana.</div>
-      <button class="plan-cta" onclick="startPlanBooking('${p.id}')">Quero esse plano</button>
     </div>
   `).join('');
+}
+// Cada card de plano começa mostrando só o selo — o cliente expande pra ver
+// os serviços incluídos, o valor e o botão de contratar.
+function togglePlanDetails(id){
+  const details = document.getElementById('planDetails-'+id);
+  const toggle = document.getElementById('planToggle-'+id);
+  if(!details || !toggle) return;
+  const isOpen = details.classList.toggle('open');
+  toggle.classList.toggle('open', isOpen);
+  toggle.querySelector('span').textContent = isOpen ? 'Ocultar detalhes' : 'Ver detalhes e valor';
 }
 
 function renderServices(){

@@ -223,8 +223,18 @@
     content:''; position:absolute; inset:0 0 auto 0; height:3px;
     background:var(--plan-accent, var(--red));
   }
-  .plan-card-top{display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:16px;}
+  .plan-card-top{display:flex; flex-direction:column; align-items:center; gap:12px;}
   .plan-badge-img{width:100%; max-width:200px; aspect-ratio:698/512; object-fit:contain; display:block; filter:drop-shadow(0 6px 14px rgba(0,0,0,.5));}
+  .plan-toggle{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:6px;
+    background:none; border:none; cursor:pointer; color:var(--muted);
+    font-size:.72rem; text-transform:uppercase; letter-spacing:.08em;
+    padding:10px 0 4px;
+  }
+  .plan-toggle-chevron{width:15px; height:15px; flex:none; transition:transform .25s ease;}
+  .plan-toggle.open .plan-toggle-chevron{transform:rotate(180deg);}
+  .plan-details{max-height:0; overflow:hidden; transition:max-height .35s ease;}
+  .plan-details.open{max-height:600px; margin-top:12px;}
   .plan-heading{display:flex; align-items:baseline; justify-content:space-between; width:100%; gap:10px;}
   .plan-name{font-family:'Playfair Display',serif; font-size:1.05rem; font-weight:600; color:var(--cream); letter-spacing:.02em;}
   .plan-price{font-family:'Playfair Display',serif; font-size:1.15rem; color:var(--plan-accent, var(--red-bright)); font-weight:600; white-space:nowrap;}
