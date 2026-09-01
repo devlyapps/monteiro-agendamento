@@ -939,25 +939,32 @@ function generateSlots(dateIso, profId, isAdmin, excludeBookingId, serviceDurati
   const blockedSlots = businessConfig.blockedSlots || [];
 
   const slots = [];
-  // Monta um Set de todos os minutos ocupados por agendamentos existentes
-  // levando em conta a duração de cada serviço já marcado
-  const occupiedMins = new Set();
+  // Monta a lista de intervalos [início, fim) já ocupados por agendamentos
+  // existentes, levando em conta a duração de cada serviço já marcado.
+  // Importante: NÃO dá pra amostrar isso em minutos múltiplos do intervalo
+  // padrão (ex: de 40 em 40 a partir do horário de CADA agendamento) — se o
+  // agendamento existente não começar num horário alinhado à grade (ex: um
+  // corte marcado às 07:30 numa grade de 40min que só passa em 06:00, 06:40,
+  // 07:20, 08:00...), os minutos amostrados nunca coincidem com os minutos
+  // candidatos da grade, mesmo quando os horários realmente se sobrepõem —
+  // e o slot aparece como livre por engano. Por isso comparamos os intervalos
+  // diretamente (mesma lógica de sobreposição já usada no backend).
   // excludeBookingId ignora o próprio agendamento sendo editado — senão o
   // horário atual dele apareceria como "ocupado" por ele mesmo, impedindo o
   // admin de deixar o agendamento no mesmo horário depois de editar outra coisa.
-  bookings.filter(b => b.profId === profId && b.date === dateIso && b.id !== excludeBookingId).forEach(b => {
-    const booked = services.find(s => s.id === Number(b.serviceId));
-    // Fallback pro intervalo padrão se o serviço não tiver duração válida
-    // cadastrada (0, vazio etc) — senão o horário ocupado por ele não é
-    // considerado e a vaga aparece como livre por engano.
-    const bookedDur = booked ? Number(booked.duration) : NaN;
-    const dur = (bookedDur > 0) ? bookedDur : businessConfig.interval;
-    const [bh, bm] = (b.time||'00:00').split(':').map(Number);
-    const start = bh*60+bm;
-    for(let t = start; t < start + dur; t += businessConfig.interval){
-      occupiedMins.add(t);
-    }
-  });
+  const occupiedRanges = bookings
+    .filter(b => b.profId === profId && b.date === dateIso && b.id !== excludeBookingId)
+    .map(b => {
+      const booked = services.find(s => s.id === Number(b.serviceId));
+      // Fallback pro intervalo padrão se o serviço não tiver duração válida
+      // cadastrada (0, vazio etc) — senão o horário ocupado por ele não é
+      // considerado e a vaga aparece como livre por engano.
+      const bookedDur = booked ? Number(booked.duration) : NaN;
+      const dur = (bookedDur > 0) ? bookedDur : businessConfig.interval;
+      const [bh, bm] = (b.time||'00:00').split(':').map(Number);
+      const start = bh*60+bm;
+      return { start, end: start + dur };
+    });
 
   // Duração do serviço que está sendo consultado agora. Precisa vir explícita
   // por parâmetro — antes essa função lia direto o state.selectedService global,
@@ -981,11 +988,10 @@ function generateSlots(dateIso, profId, isAdmin, excludeBookingId, serviceDurati
         const [th,tm] = s.to.split(':').map(Number);
         return cur >= fh*60+fm && cur < th*60+tm;
       });
-      // Verifica se todos os minutos necessários para o serviço estão livres
-      let taken = false;
-      for(let t = cur; t < cur + serviceDuration; t += businessConfig.interval){
-        if(occupiedMins.has(t)){ taken = true; break; }
-      }
+      // Verifica se a faixa [cur, cur+serviceDuration) do slot candidato
+      // sobrepõe a faixa [start, end) de algum agendamento já existente.
+      const slotEnd = cur + serviceDuration;
+      const taken = occupiedRanges.some(r => cur < r.end && r.start < slotEnd);
       // Verifica se o serviço cabe dentro do bloco (não ultrapassa o horário de fechamento)
       const fitsInBlock = (cur + serviceDuration) <= block.end;
       slots.push({ time, available: !taken && !pastToday && !onBlockedSlot && fitsInBlock });
