@@ -315,18 +315,25 @@ function buildLoyaltyNextMsg(total){
 // `visits` já vem do backend ordenado do mais recente para o mais antigo. Numeramos
 // pela posição real no ciclo (1 = primeira visita) pra bater com os selos do cartão
 // acima, que preenchem 1→total na ordem cronológica.
-function buildHistoryHTML(visits){
+// `isAdmin` liga o botão de remover visita — só o admin pode cancelar uma
+// validação (o cliente vê o próprio histórico sem essa opção).
+function buildHistoryHTML(visits, isAdmin){
   if(!visits.length) return `<div class="empty-note" style="padding:0;">Nenhuma visita validada ainda.</div>`;
   return visits.map((v, idx) => {
     const num = visits.length - idx;
     const d = new Date(v.date + 'T00:00');
     const dateStr = `${weekdayLabel[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    const removeBtn = isAdmin ? `
+      <button class="icon-btn small danger" onclick="removeLoyaltyVisit('${escapeForJsAttr(v.validatedAt||'')}','${escapeForJsAttr(v.serviceName||'Atendimento')}')" title="Remover esta visita do cartão">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
+      </button>` : '';
     return `<div class="loyalty-history-item">
       <div class="loyalty-history-num">${num}</div>
       <div class="loyalty-history-info">
         <strong>${v.serviceName || 'Atendimento'}</strong>
         <span>${dateStr}</span>
       </div>
+      ${removeBtn}
     </div>`;
   }).join('');
 }
@@ -2652,9 +2659,14 @@ async function saveAdminBooking(btnEl){
 
 /* ===================== ADMIN · MODAL FIDELIDADE CLIENTE ===================== */
 let loyaltyModalCurrentPhone = '';
+let loyaltyModalCurrentName = '';
+// Guarda as visitas já carregadas pra remover uma localmente (sem recarregar
+// o modal inteiro) quando o admin cancela uma validação.
+let loyaltyModalCurrentVisits = [];
 
 async function openLoyaltyModal(name, phone, loyaltyCount){
   loyaltyModalCurrentPhone = phone;
+  loyaltyModalCurrentName = name || 'Cliente';
   document.getElementById('loyaltyModalName').textContent = name || 'Cliente';
   const phoneFormatted = formatPhoneBR(phone);
   document.getElementById('loyaltyModalPhone').textContent = phoneFormatted;
@@ -2674,6 +2686,7 @@ async function openLoyaltyModal(name, phone, loyaltyCount){
     } catch(e){}
   }
 
+  loyaltyModalCurrentVisits = visits;
   renderLoyaltyModalBody(name, total, visits);
 }
 
@@ -2682,7 +2695,7 @@ function renderLoyaltyModalBody(name, total, visits){
   const msg = buildLoyaltyNextMsg(total);
   const nextMsg = `<div style="background:${msg.bg};border:1px solid ${msg.border};border-radius:8px;padding:8px 12px;text-align:center;font-size:.78rem;color:${msg.color};margin-bottom:18px;">${msg.text}</div>`;
   const histHtml = visits.length
-    ? `<div style="padding:0 22px;">${buildHistoryHTML(visits)}</div>`
+    ? `<div style="padding:0 22px;">${buildHistoryHTML(visits, true)}</div>`
     : `<div style="padding:12px 22px; font-size:.82rem; color:var(--muted); text-align:center;">Nenhuma visita validada ainda.</div>`;
 
   const resetBtn = total >= 10 ? `
@@ -2740,7 +2753,25 @@ async function resetLoyaltyCard(name){
   const idx = clientesCache.findIndex(c => String(c.phone).replace(/\D/g,'') === phone);
   if(idx !== -1) clientesCache[idx].loyaltyCount = 0;
   toast(`✅ Cartão de ${name} zerado! Novo ciclo iniciado.`, 4000);
+  loyaltyModalCurrentVisits = [];
   renderLoyaltyModalBody(name, 0, []);
+}
+
+// Cancela a validação de UMA visita específica (ex: validada por engano),
+// sem mexer nas outras. Identifica a linha na aba FIDELIDADE pelo timestamp
+// exato de validação (validatedAt), que é único por visita.
+async function removeLoyaltyVisit(validatedAt, serviceName){
+  if(!confirm(`Remover a visita "${serviceName}" do cartão fidelidade?\n\nO cliente volta uma casa no cartão — essa validação não poderá ser desfeita.`)) return;
+  const phone = loyaltyModalCurrentPhone;
+  if(!phone){ toast('Erro: telefone não encontrado'); return; }
+  toast('Removendo visita...');
+  const res = await apiPost('removeLoyaltyVisit', { phone, validatedAt });
+  if(res.error){ toast('Erro: ' + res.error); return; }
+  loyaltyModalCurrentVisits = loyaltyModalCurrentVisits.filter(v => v.validatedAt !== validatedAt);
+  const idx = clientesCache.findIndex(c => String(c.phone).replace(/\D/g,'') === phone);
+  if(idx !== -1) clientesCache[idx].loyaltyCount = res.total;
+  toast('Visita removida do cartão fidelidade');
+  renderLoyaltyModalBody(loyaltyModalCurrentName, res.total, loyaltyModalCurrentVisits);
 }
 
 /* ===================== ADMIN · CLIENTES ===================== */
