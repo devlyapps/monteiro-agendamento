@@ -52,6 +52,11 @@
   .screen.active{display:block; animation:fadeSlide .4s ease;}
   .screen.no-nav{padding-bottom:0;}
   @keyframes fadeSlide{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+  /* Fundo escuro dos modais (Horarios do dia, sucesso, fidelidade, compartilhar):
+     sem isso, o overlay vai de display:none pra display:flex já na opacidade
+     final (78-85% preto), aparecendo de vez antes da folha deslizar pra cima
+     em .3s — nesse intervalo a tela fica quase toda preta, o que parece um bug. */
+  @keyframes overlayFadeIn{from{opacity:0;} to{opacity:1;}}
   @media (prefers-reduced-motion: reduce){
     .screen.active{animation:none;}
     .logo-mark{animation:none;}
@@ -370,7 +375,7 @@
     position:fixed; inset:0; background:rgba(0,0,0,.82); backdrop-filter:blur(5px);
     display:none; align-items:flex-end; justify-content:center; z-index:60; padding:0;
   }
-  .day-slots-overlay.show{display:flex;}
+  .day-slots-overlay.show{display:flex; animation:overlayFadeIn .22s ease;}
   .day-slots-sheet{
     width:100%; max-width:430px; background:var(--surface); border-radius:22px 22px 0 0;
     border-top:1px solid var(--red-dim); padding:0 0 32px;
@@ -437,7 +442,7 @@
     position:fixed; inset:0; background:rgba(0,0,0,.78); backdrop-filter:blur(4px);
     display:none; align-items:center; justify-content:center; z-index:50; padding:24px;
   }
-  .modal-overlay.show{display:flex;}
+  .modal-overlay.show{display:flex; animation:overlayFadeIn .22s ease;}
   .modal-card{
     width:100%; max-width:380px; background:var(--surface); border:1px solid var(--green-dim);
     border-radius:var(--radius); padding:32px 24px; text-align:center; animation:fadeSlide .3s ease;
@@ -572,7 +577,7 @@
     position:fixed; inset:0; background:rgba(0,0,0,.85); backdrop-filter:blur(5px);
     display:none; align-items:flex-end; justify-content:center; z-index:70; padding:0;
   }
-  .loyalty-modal-overlay.show{display:flex;}
+  .loyalty-modal-overlay.show{display:flex; animation:overlayFadeIn .22s ease;}
   .loyalty-modal-sheet{
     width:100%; max-width:430px; background:var(--surface);
     border-radius:22px 22px 0 0; border-top:1px solid var(--red-dim);
@@ -607,7 +612,7 @@
     position:fixed; inset:0; background:rgba(0,0,0,.82); backdrop-filter:blur(5px);
     display:none; align-items:flex-end; justify-content:center; z-index:80;
   }
-  .share-modal-overlay.show{ display:flex; }
+  .share-modal-overlay.show{ display:flex; animation:overlayFadeIn .22s ease; }
   .share-modal-sheet{
     width:100%; max-width:430px; background:var(--surface);
     border-radius:22px 22px 0 0; border-top:1px solid var(--red-dim);
