@@ -766,8 +766,15 @@
 
   /* ---------- BOTTOM NAV ---------- */
   .bottom-nav{
+    /* Sem backdrop-filter: um elemento position:fixed com blur precisa ser
+       recomposto a cada frame de rolagem (o conteúdo atrás dele muda o tempo
+       todo) — em páginas mais longas (ex: Caixa com filtro de várias semanas)
+       isso pode travar o navegador e piscar preto durante a rolagem no
+       celular. O fundo já é quase opaco (92%), então o desfoque não fazia
+       tanta diferença visual pra valer esse custo.
+    */
     position:fixed; bottom:0; left:0; right:0; max-width:430px; margin:0 auto;
-    background:rgba(12,10,9,.92); backdrop-filter:blur(10px);
+    background:rgba(12,10,9,.92);
     border-top:1px solid var(--red-dim);
     display:none; justify-content:space-around; padding:12px 10px 16px; z-index:8;
   }
