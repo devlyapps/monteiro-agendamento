@@ -3030,17 +3030,13 @@ const caixaMoney = n => Number.isInteger(n)
   : n.toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
 const caixaIsoDay = (y, m, d) => `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 
-// Cards dos 12 meses do ano corrente: total do mês + quanto foi em dinheiro,
-// cartão e Pix. Segue a mesma regra da lista (só visitas validadas, e o filtro
-// de colaborador). O card do mês cujo período está aplicado fica destacado.
-function renderCaixaMonthCards(){
-  const wrap = document.getElementById('caixaMonths');
-  if(!wrap) return;
-  const year = new Date().getFullYear();
+// Totais dos 12 meses do ano corrente (total + dinheiro/cartão/Pix/outros).
+// Mesma regra da lista do Caixa: só visitas validadas e o filtro de colaborador.
+// Usado pelos cards dos meses e pelo gráfico.
+function caixaMonthTotals(year){
   const profEl = document.getElementById('caixaProfFilter');
   const profId = profEl ? profEl.value : 'all';
   const months = Array.from({ length:12 }, () => ({ total:0, cash:0, card:0, pix:0, other:0 }));
-
   bookings.forEach(b => {
     if(!validatedBookingIds.has(String(b.id))) return;
     if(profId !== 'all' && b.profId !== Number(profId)) return;
@@ -3055,6 +3051,81 @@ function renderCaixaMonthCards(){
     else if(method === 'Cartão' || method === 'Crédito' || method === 'Débito') bucket.card += price;
     else bucket.other += price;
   });
+  return months;
+}
+
+// Gráfico de linha do faturamento mês a mês (janeiro a dezembro). Os meses sem
+// movimento (ex: antes do app começar a ser usado) ficam em R$ 0 na linha base.
+// A linha vai só até o mês atual — meses futuros ficam sem ponto, senão pareceria
+// que o faturamento despencou pra zero. Tocar num mês mostra o valor dele.
+const CAIXA_MONTHS_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+let caixaChartSel = new Date().getMonth();
+const caixaShortMoney = n => n >= 1000 ? `${(n/1000).toLocaleString('pt-BR', { maximumFractionDigits:1 })} mil` : String(n);
+function caixaNiceMax(v){
+  if(v <= 0) return 100;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / pow;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 4 ? 4 : n <= 8 ? 8 : 10) * pow;
+}
+function selectCaixaChartMonth(i){
+  caixaChartSel = i;
+  renderCaixaChart();
+}
+function renderCaixaChart(){
+  const wrap = document.getElementById('caixaChart');
+  if(!wrap) return;
+  const year = new Date().getFullYear();
+  const totals = caixaMonthTotals(year).map(m => m.total);
+  let lastIdx = new Date().getMonth();
+  totals.forEach((t, i) => { if(t > 0 && i > lastIdx) lastIdx = i; });
+  if(caixaChartSel > lastIdx) caixaChartSel = lastIdx;
+
+  const label = document.getElementById('caixaChartLabel');
+  if(label) label.textContent = `Faturamento por mês · ${year}`;
+
+  const W = 340, H = 190, padL = 42, padR = 10, padT = 12, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB, colW = plotW / 12;
+  const max = caixaNiceMax(Math.max(...totals));
+  const x = i => padL + (i + 0.5) * colW;
+  const y = v => padT + plotH * (1 - v / max);
+
+  const grid = [0, 1, 2, 3, 4].map(k => {
+    const v = max * k / 4, gy = y(v);
+    return `<line class="cc-grid" x1="${padL}" x2="${W - padR}" y1="${gy}" y2="${gy}"/>
+      <text class="cc-axis" x="${padL - 6}" y="${gy + 3}" text-anchor="end">${caixaShortMoney(v)}</text>`;
+  }).join('');
+  const xLabels = CAIXA_MONTHS_ABBR.map((m, i) =>
+    `<text class="cc-axis${i === caixaChartSel ? ' sel' : ''}" x="${x(i)}" y="${H - 8}" text-anchor="middle">${m}</text>`).join('');
+
+  const pts = totals.slice(0, lastIdx + 1).map((t, i) => [x(i), y(t)]);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+  const base = y(0).toFixed(1);
+  const area = `${line} L${pts[pts.length - 1][0].toFixed(1)} ${base} L${pts[0][0].toFixed(1)} ${base} Z`;
+  const dots = pts.map((p, i) =>
+    `<circle class="cc-dot${i === caixaChartSel ? ' sel' : ''}" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === caixaChartSel ? 4.5 : 3}"/>`).join('');
+  const hits = CAIXA_MONTHS_ABBR.map((m, i) =>
+    `<rect class="cc-hit" x="${padL + i * colW}" y="${padT}" width="${colW}" height="${plotH + padB}" onclick="selectCaixaChartMonth(${i})"/>`).join('');
+
+  wrap.innerHTML = `
+    <div class="cc-readout"><span>${monthNames[caixaChartSel]}</span><strong>R$ ${caixaMoney(totals[caixaChartSel])}</strong></div>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Faturamento mensal de janeiro a dezembro">
+      <defs><linearGradient id="ccFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#e2543a" stop-opacity=".35"/><stop offset="100%" stop-color="#e2543a" stop-opacity="0"/>
+      </linearGradient></defs>
+      ${grid}${xLabels}
+      <path d="${area}" fill="url(#ccFill)"/>
+      <path class="cc-line" d="${line}"/>
+      ${dots}${hits}
+    </svg>`;
+}
+
+// Cards dos 12 meses do ano corrente: total do mês + quanto foi em dinheiro,
+// cartão e Pix. O card do mês cujo período está aplicado fica destacado.
+function renderCaixaMonthCards(){
+  const wrap = document.getElementById('caixaMonths');
+  if(!wrap) return;
+  const year = new Date().getFullYear();
+  const months = caixaMonthTotals(year);
 
   const label = document.getElementById('caixaMonthsLabel');
   if(label) label.textContent = `Meses de ${year}`;
@@ -3168,6 +3239,7 @@ function bookingPrice(b){
 }
 
 function renderCaixaList(){
+  renderCaixaChart();
   renderCaixaMonthCards();
   const profId = document.getElementById('caixaProfFilter') ? document.getElementById('caixaProfFilter').value : 'all';
   // Só entra na Caixa o que foi validado pelo barbeiro (visita confirmada = serviço pago).

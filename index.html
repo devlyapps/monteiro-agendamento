@@ -300,7 +300,17 @@
     </div>
 
     <div class="chip-row" id="adminTabs">
-      <div class="chip chip-money" data-tab="caixa" onclick="setAdminTab('caixa')">Caixa</div>
+      <div class="chip chip-money" data-tab="caixa" onclick="setAdminTab('caixa')">
+        <svg class="chip-icon" viewBox="0 0 512 512" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M200 45V85M262 8V90M322 45V85"/>
+          <circle cx="262" cy="215" r="118"/>
+          <path d="M262 156V178M262 288V306M292 205C292 185 278 178 262 178C244 178 232 190 232 207C232 226 248 230 262 234C277 238 294 243 294 262C294 280 280 288 262 288C244 288 230 280 230 262"/>
+          <rect x="40" y="345" width="75" height="155" rx="4"/>
+          <path d="M115 378L168 366C200 358 232 376 285 380L335 384C400 384 430 372 448 372C472 372 478 392 462 402L336 488C322 497 306 500 290 496L190 474L115 468"/>
+          <path d="M255 430H338C362 430 366 408 340 396"/>
+        </svg>
+        Caixa
+      </div>
       <div class="chip" data-tab="agenda" onclick="setAdminTab('agenda')">Agendas</div>
       <div class="chip active" data-tab="hours" onclick="setAdminTab('hours')">Funcionamento</div>
       <div class="chip" data-tab="staff" onclick="setAdminTab('staff')">Colaboradores</div>
@@ -456,10 +466,11 @@
 
     <!-- TAB: CAIXA -->
     <div class="admin-tab" id="adminTab-caixa" style="display:none;">
-      <div class="admin-block"><h3>Caixa · Serviços finalizados</h3></div>
-      <p style="padding:0 22px 10px; font-size:.8rem; color:var(--muted);">Só entram aqui os agendamentos que foram <strong>validados</strong> pelo barbeiro (o mesmo botão de validar visita da Agenda) — é o que conta como serviço concluído e pago.</p>
+      <!-- Gráfico de linha do faturamento mês a mês -->
+      <div class="section-label" style="margin-top:4px;"><span id="caixaChartLabel">Faturamento por mês</span><div class="line"></div></div>
+      <div class="caixa-chart" id="caixaChart"></div>
 
-      <!-- Meses do ano: clicar aplica o filtro do mês inteiro na hora -->
+      <!-- Meses do ano: clicar abre os dados do mês -->
       <div class="section-label" style="margin-top:4px;"><span id="caixaMonthsLabel">Meses do ano</span><div class="line"></div></div>
       <div class="caixa-months" id="caixaMonths"></div>
 

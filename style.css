@@ -204,7 +204,8 @@
     transition:all .15s;
   }
   .chip.active{background:var(--red-bright); color:#1a1208; border-color:var(--red-bright); font-weight:600;}
-  .chip-money{border-color:rgba(63,174,102,.45); color:var(--green-bright); font-weight:600;}
+  .chip-money{border-color:rgba(63,174,102,.45); color:var(--green-bright); font-weight:600; display:inline-flex; align-items:center; gap:7px;}
+  .chip-icon{width:20px; height:20px; flex:none;}
   .chip-money.active{background:var(--green-bright); color:#0d2414; border-color:var(--green-bright);}
 
   .section-label{
@@ -298,6 +299,20 @@
   .summary-chip b{color:var(--red-bright); font-size:1.05rem; font-family:'Playfair Display',serif;}
 
   /* ---------- Caixa: cards dos meses do ano ---------- */
+  /* ---------- Caixa: gráfico de faturamento mensal ---------- */
+  .caixa-chart{margin:0 22px 18px; padding:12px 10px 8px; background:var(--surface); border:1px solid var(--red-dim); border-radius:var(--radius-sm);}
+  .caixa-chart svg{display:block; width:100%; height:auto; overflow:visible;}
+  .cc-readout{display:flex; justify-content:space-between; align-items:baseline; padding:0 6px 8px;}
+  .cc-readout span{font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);}
+  .cc-readout strong{font-family:'Playfair Display',serif; font-size:1.15rem; color:var(--red-bright);}
+  .cc-grid{stroke:rgba(255,255,255,.07); stroke-width:1;}
+  .cc-axis{fill:var(--muted-2); font-size:10px; font-family:'Jost',sans-serif;}
+  .cc-axis.sel{fill:var(--cream); font-weight:600;}
+  .cc-line{fill:none; stroke:var(--red-bright); stroke-width:2.2; stroke-linejoin:round; stroke-linecap:round;}
+  .cc-dot{fill:var(--surface); stroke:var(--red-bright); stroke-width:2;}
+  .cc-dot.sel{fill:var(--red-bright);}
+  .cc-hit{fill:transparent; cursor:pointer;}
+
   /* align-items:start: cada card tem a própria altura, então abrir um mês não estica os vizinhos */
   .caixa-months{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; padding:0 22px 16px; align-items:start;}
   .caixa-month-card{
