@@ -298,17 +298,30 @@
   .summary-chip b{color:var(--red-bright); font-size:1.05rem; font-family:'Playfair Display',serif;}
 
   /* ---------- Caixa: cards dos meses do ano ---------- */
-  .caixa-months{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; padding:0 22px 16px;}
+  /* align-items:start: cada card tem a própria altura, então abrir um mês não estica os vizinhos */
+  .caixa-months{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; padding:0 22px 16px; align-items:start;}
   .caixa-month-card{
-    display:flex; flex-direction:column; gap:3px; text-align:left; cursor:pointer;
     background:var(--surface); border:1px solid var(--red-dim); border-radius:var(--radius-sm);
-    padding:10px 9px; color:var(--cream); min-width:0;
+    color:var(--cream); min-width:0; overflow:hidden;
   }
-  .caixa-month-card.empty{opacity:.55;}
-  .caixa-month-card.active{opacity:1; border-color:var(--red-bright); background:rgba(196,60,45,.14);}
-  .caixa-month-card:active{transform:scale(.97);}
+  .caixa-month-card.empty:not(.open){opacity:.55;}
+  .caixa-month-card.open{border-color:rgba(196,60,45,.4);}
+  .caixa-month-card.active{border-color:var(--red-bright); background:rgba(196,60,45,.14);}
+  .cmc-head{
+    width:100%; display:flex; align-items:center; justify-content:space-between; gap:4px;
+    background:none; border:none; color:inherit; cursor:pointer; text-align:left; padding:11px 9px;
+  }
+  .cmc-head:active{opacity:.7;}
+  .cmc-chevron{width:13px; height:13px; flex:none; color:var(--muted); transition:transform .2s ease;}
+  .caixa-month-card.open .cmc-chevron{transform:rotate(180deg);}
+  .cmc-body{display:none; flex-direction:column; gap:3px; padding:0 9px 10px;}
+  .caixa-month-card.open .cmc-body{display:flex;}
+  .cmc-filter{
+    margin-top:7px; padding:6px 4px; width:100%; cursor:pointer; font-size:.6rem; letter-spacing:.03em;
+    background:rgba(196,60,45,.1); border:1px solid var(--red-dim); border-radius:8px; color:var(--cream);
+  }
   .cmc-name{font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);}
-  .caixa-month-card.active .cmc-name{color:var(--cream);}
+  .caixa-month-card.open .cmc-name, .caixa-month-card.active .cmc-name{color:var(--cream);}
   .cmc-total{font-family:'Playfair Display',serif; font-size:1rem; color:var(--red-bright); margin-bottom:3px; white-space:nowrap;}
   .cmc-line{display:flex; flex-wrap:wrap; justify-content:space-between; column-gap:4px; font-size:.6rem; color:var(--muted);}
   .cmc-line i, .cmc-line b{white-space:nowrap;}

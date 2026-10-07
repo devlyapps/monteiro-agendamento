@@ -3062,13 +3062,38 @@ function renderCaixaMonthCards(){
   wrap.innerHTML = months.map((m, i) => {
     const lastDay = new Date(year, i + 1, 0).getDate();
     const active = caixaRangeFrom === caixaIsoDay(year, i, 1) && caixaRangeTo === caixaIsoDay(year, i, lastDay);
+    const open = caixaOpenMonths.has(i);
     const line = (name, val) => `<span class="cmc-line"><i>${name}</i><b>R$ ${caixaMoney(val)}</b></span>`;
-    return `<button class="caixa-month-card${active ? ' active' : ''}${m.total === 0 ? ' empty' : ''}" onclick="selectCaixaMonth(${i})">
-      <span class="cmc-name">${monthNames[i]}</span>
-      <strong class="cmc-total">R$ ${caixaMoney(m.total)}</strong>
-      ${line('Dinheiro', m.cash)}${line('Cartão', m.card)}${line('Pix', m.pix)}${m.other > 0 ? line('Outros', m.other) : ''}
-    </button>`;
+    return `<div class="caixa-month-card${open ? ' open' : ''}${active ? ' active' : ''}${m.total === 0 ? ' empty' : ''}" id="caixaMonth-${i}">
+      <button class="cmc-head" onclick="toggleCaixaMonth(${i})" aria-expanded="${open}">
+        <span class="cmc-name">${monthNames[i]}</span>
+        <svg class="cmc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="cmc-body">
+        <strong class="cmc-total">R$ ${caixaMoney(m.total)}</strong>
+        ${line('Dinheiro', m.cash)}${line('Cartão', m.card)}${line('Pix', m.pix)}${m.other > 0 ? line('Outros', m.other) : ''}
+        <button class="cmc-filter" onclick="filterCaixaMonth(${i})">Ver lista do mês</button>
+      </div>
+    </div>`;
   }).join('');
+}
+
+// Os cards começam fechados (só o nome do mês). Clicar abre/fecha os dados;
+// dá pra deixar vários abertos ao mesmo tempo pra comparar um mês com outro.
+const caixaOpenMonths = new Set();
+function toggleCaixaMonth(i){
+  const card = document.getElementById('caixaMonth-' + i);
+  if(!card) return;
+  const open = !caixaOpenMonths.has(i);
+  if(open) caixaOpenMonths.add(i); else caixaOpenMonths.delete(i);
+  card.classList.toggle('open', open);
+  card.querySelector('.cmc-head').setAttribute('aria-expanded', open);
+}
+// Aplica o mês inteiro no calendário/lista e leva a tela até a lista.
+function filterCaixaMonth(i){
+  selectCaixaMonth(i);
+  const target = document.getElementById('caixaCount');
+  if(target) target.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 // Aplica o período do 1º ao último dia do mês escolhido (ano corrente).
