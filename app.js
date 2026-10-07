@@ -322,7 +322,12 @@ function buildHistoryHTML(visits, isAdmin){
   return visits.map((v, idx) => {
     const num = visits.length - idx;
     const d = new Date(v.date + 'T00:00');
-    const dateStr = `${weekdayLabel[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    // "Ter, 01/09/2026 · 14:40" — o horário é o do agendamento (vem do backend
+    // pelo bookingId); visitas antigas sem agendamento vinculado mostram só a data.
+    let dateStr = isNaN(d.getTime())
+      ? '—'
+      : `${weekdayLabel[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    if(v.time) dateStr += ` · ${v.time}`;
     const removeBtn = isAdmin ? `
       <button class="icon-btn small danger" onclick="removeLoyaltyVisit('${escapeForJsAttr(v.validatedAt||'')}','${escapeForJsAttr(v.serviceName||'Atendimento')}')" title="Remover esta visita do cartão">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
@@ -2991,7 +2996,6 @@ function caixaCalToday(){
   caixaCalMonth = new Date().getMonth();
   caixaRangeFrom = isoOffset(0);
   caixaRangeTo   = isoOffset(0);
-  resetCaixaMonthFilter();
   syncCaixaRangeInputs();
   renderCaixaCal();
   renderCaixaList();
@@ -3001,7 +3005,6 @@ function caixaCalToday(){
 function caixaCalSelectDay(iso){
   caixaRangeFrom = iso;
   caixaRangeTo   = iso;
-  resetCaixaMonthFilter();
   syncCaixaRangeInputs();
   renderCaixaCal();
   renderCaixaList();
@@ -3019,18 +3022,57 @@ function updateCaixaRange(){
   caixaRangeFrom = fromEl.value;
   caixaRangeTo   = toEl.value;
   if(caixaRangeFrom > caixaRangeTo){ [caixaRangeFrom, caixaRangeTo] = [caixaRangeTo, caixaRangeFrom]; syncCaixaRangeInputs(); }
-  resetCaixaMonthFilter();
   renderCaixaCal();
   renderCaixaList();
 }
-function resetCaixaMonthFilter(){
-  const el = document.getElementById('caixaMonthFilter');
-  if(el) el.value = '';
+const caixaMoney = n => Number.isInteger(n)
+  ? n.toLocaleString('pt-BR')
+  : n.toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+const caixaIsoDay = (y, m, d) => `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+// Cards dos 12 meses do ano corrente: total do mês + quanto foi em dinheiro,
+// cartão e Pix. Segue a mesma regra da lista (só visitas validadas, e o filtro
+// de colaborador). O card do mês cujo período está aplicado fica destacado.
+function renderCaixaMonthCards(){
+  const wrap = document.getElementById('caixaMonths');
+  if(!wrap) return;
+  const year = new Date().getFullYear();
+  const profEl = document.getElementById('caixaProfFilter');
+  const profId = profEl ? profEl.value : 'all';
+  const months = Array.from({ length:12 }, () => ({ total:0, cash:0, card:0, pix:0, other:0 }));
+
+  bookings.forEach(b => {
+    if(!validatedBookingIds.has(String(b.id))) return;
+    if(profId !== 'all' && b.profId !== Number(profId)) return;
+    const iso = String(b.date).slice(0,10);
+    if(Number(iso.slice(0,4)) !== year) return;
+    const bucket = months[Number(iso.slice(5,7)) - 1];
+    const price = bookingPrice(b);
+    bucket.total += price;
+    const method = b.payment || '';
+    if(method === 'Dinheiro') bucket.cash += price;
+    else if(method === 'Pix') bucket.pix += price;
+    else if(method === 'Cartão' || method === 'Crédito' || method === 'Débito') bucket.card += price;
+    else bucket.other += price;
+  });
+
+  const label = document.getElementById('caixaMonthsLabel');
+  if(label) label.textContent = `Meses de ${year}`;
+
+  wrap.innerHTML = months.map((m, i) => {
+    const lastDay = new Date(year, i + 1, 0).getDate();
+    const active = caixaRangeFrom === caixaIsoDay(year, i, 1) && caixaRangeTo === caixaIsoDay(year, i, lastDay);
+    const line = (name, val) => `<span class="cmc-line"><i>${name}</i><b>R$ ${caixaMoney(val)}</b></span>`;
+    return `<button class="caixa-month-card${active ? ' active' : ''}${m.total === 0 ? ' empty' : ''}" onclick="selectCaixaMonth(${i})">
+      <span class="cmc-name">${monthNames[i]}</span>
+      <strong class="cmc-total">R$ ${caixaMoney(m.total)}</strong>
+      ${line('Dinheiro', m.cash)}${line('Cartão', m.card)}${line('Pix', m.pix)}${m.other > 0 ? line('Outros', m.other) : ''}
+    </button>`;
+  }).join('');
 }
-// Preenche o filtro de mês (Janeiro até o mês atual, no ano corrente) e aplica
-// o período de 1º ao último dia do mês escolhido.
+
+// Aplica o período do 1º ao último dia do mês escolhido (ano corrente).
 function selectCaixaMonth(value){
-  if(value === '') return; // "Período personalizado" — deixa o filtro atual como está
   const month = Number(value);
   const year  = new Date().getFullYear();
   const first = new Date(year, month, 1);
@@ -3083,14 +3125,6 @@ function renderCaixaTab(){
   const profSelect = document.getElementById('caixaProfFilter');
   profSelect.innerHTML = `<option value="all">Todos os colaboradores</option>` +
     professionals.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-  const monthSelect = document.getElementById('caixaMonthFilter');
-  if(monthSelect){
-    const nowMonth = new Date().getMonth();
-    let opts = `<option value="">Período personalizado</option>`;
-    for(let m = 0; m <= nowMonth; m++) opts += `<option value="${m}">${monthNames[m]}</option>`;
-    monthSelect.innerHTML = opts;
-    monthSelect.value = '';
-  }
   caixaCalYear  = new Date().getFullYear();
   caixaCalMonth = new Date().getMonth();
   caixaRangeFrom = isoOffset(0);
@@ -3109,6 +3143,7 @@ function bookingPrice(b){
 }
 
 function renderCaixaList(){
+  renderCaixaMonthCards();
   const profId = document.getElementById('caixaProfFilter') ? document.getElementById('caixaProfFilter').value : 'all';
   // Só entra na Caixa o que foi validado pelo barbeiro (visita confirmada = serviço pago).
   let list = bookings.filter(b => {

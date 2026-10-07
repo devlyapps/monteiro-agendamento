@@ -297,6 +297,24 @@
   .summary-chip div p{font-size:.76rem; color:var(--muted); margin-top:2px;}
   .summary-chip b{color:var(--red-bright); font-size:1.05rem; font-family:'Playfair Display',serif;}
 
+  /* ---------- Caixa: cards dos meses do ano ---------- */
+  .caixa-months{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; padding:0 22px 16px;}
+  .caixa-month-card{
+    display:flex; flex-direction:column; gap:3px; text-align:left; cursor:pointer;
+    background:var(--surface); border:1px solid var(--red-dim); border-radius:var(--radius-sm);
+    padding:10px 9px; color:var(--cream); min-width:0;
+  }
+  .caixa-month-card.empty{opacity:.55;}
+  .caixa-month-card.active{opacity:1; border-color:var(--red-bright); background:rgba(196,60,45,.14);}
+  .caixa-month-card:active{transform:scale(.97);}
+  .cmc-name{font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);}
+  .caixa-month-card.active .cmc-name{color:var(--cream);}
+  .cmc-total{font-family:'Playfair Display',serif; font-size:1rem; color:var(--red-bright); margin-bottom:3px; white-space:nowrap;}
+  .cmc-line{display:flex; flex-wrap:wrap; justify-content:space-between; column-gap:4px; font-size:.6rem; color:var(--muted);}
+  .cmc-line i, .cmc-line b{white-space:nowrap;}
+  .cmc-line i{font-style:normal;}
+  .cmc-line b{font-weight:500; color:var(--cream);}
+
   .prof-row{display:flex; gap:16px; overflow-x:auto; padding:4px 22px 22px; scrollbar-width:none;}
   .prof-row::-webkit-scrollbar{display:none;}
   .prof-card{flex:none; display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; opacity:.6; transition:opacity .15s;}

@@ -459,6 +459,10 @@
       <div class="admin-block"><h3>Caixa · Serviços finalizados</h3></div>
       <p style="padding:0 22px 10px; font-size:.8rem; color:var(--muted);">Só entram aqui os agendamentos que foram <strong>validados</strong> pelo barbeiro (o mesmo botão de validar visita da Agenda) — é o que conta como serviço concluído e pago.</p>
 
+      <!-- Meses do ano: clicar aplica o filtro do mês inteiro na hora -->
+      <div class="section-label" style="margin-top:4px;"><span id="caixaMonthsLabel">Meses do ano</span><div class="line"></div></div>
+      <div class="caixa-months" id="caixaMonths"></div>
+
       <!-- Calendário da Caixa -->
       <div class="cal-wrap">
         <div class="cal-header">
@@ -477,13 +481,6 @@
         <div class="admin-times">
           <div class="field"><label>Data de início</label><input id="caixaFrom" type="date" onchange="updateCaixaRange()"></div>
           <div class="field"><label>Data de fim</label><input id="caixaTo" type="date" onchange="updateCaixaRange()"></div>
-        </div>
-      </div>
-
-      <div class="admin-day">
-        <div class="field" style="margin-bottom:0;">
-          <label>Mês</label>
-          <select id="caixaMonthFilter" onchange="selectCaixaMonth(this.value)"></select>
         </div>
       </div>
 
