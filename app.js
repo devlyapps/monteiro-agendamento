@@ -228,6 +228,8 @@ function toast(msg, duration=2200){
   setTimeout(()=>t.classList.remove('show'), duration);
 }
 function showScreen(id){
+  // Saiu do painel admin: o Caixa tranca de novo (e a aba não fica aberta por trás).
+  if(id !== 'screen-admin' && caixaUnlocked) leaveCaixa();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.getElementById('bottomNav').style.display =
@@ -1693,6 +1695,13 @@ let pinBusy = false;
 
 function lockCaixa(){ caixaUnlocked = false; caixaPinRole = null; }
 
+// Saiu do painel pra outra tela: tranca e, se a aba Caixa estava aberta, volta pra Funcionamento.
+function leaveCaixa(){
+  lockCaixa();
+  const active = document.querySelector('#adminTabs .chip.active');
+  if(active && active.dataset.tab === 'caixa') setAdminTab('hours');
+}
+
 function openPinModal(){
   pinFlow = { mode:'enter', currentPin:'' };
   renderPinModal();
@@ -1816,6 +1825,8 @@ async function submitAdminPasswordChange(){
 function setAdminTab(tab){
   // Caixa só abre com PIN; sem ele, pede o PIN e fica na aba atual.
   if(tab === 'caixa' && !caixaUnlocked){ openPinModal(); return; }
+  // Saiu da aba Caixa: tranca, então voltar a ela pede o PIN de novo.
+  if(tab !== 'caixa') lockCaixa();
   if(tab !== 'config') hideCaixaPin();
   document.querySelectorAll('#adminTabs .chip').forEach(c => c.classList.toggle('active', c.dataset.tab === tab));
   document.querySelectorAll('.admin-tab').forEach(t => t.style.display = 'none');
