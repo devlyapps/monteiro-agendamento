@@ -522,6 +522,7 @@ async function enterAdmin(){
   }
   bookings = res.bookings;
   state.isAdmin = true;
+  lockCaixa(); // cada entrada no painel pede o PIN de novo pro Caixa
   clientesCache = [];
   document.getElementById('navAdmin').style.display = 'flex';
   document.getElementById('navProfile').style.display = 'none';
@@ -538,6 +539,7 @@ async function enterAdmin(){
 function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 function logoutUser(){
   state.loggedIn = false; state.isAdmin = false; state.userPhone = null; state.userPhoto = null; state.adminToken = null;
+  lockCaixa();
   state.selectedService = null; state.selectedProf = null; state.selectedDate = null; state.selectedSlot = null;
   myBookings = [];
   editingBookingId = null;
@@ -1680,8 +1682,141 @@ async function saveAdminConfig(){
   toast('Configurações salvas!');
 }
 
+/* ===================== PIN DO CAIXA ===================== */
+// A aba Caixa só abre depois do PIN de 4 dígitos. Quem confere o PIN é o servidor
+// (verifyCaixaPin, em Code.gs) — nenhum PIN fica neste arquivo, que é público.
+// Fica liberado só nesta sessão: recarregar a página ou sair da conta pede o PIN de novo.
+let caixaUnlocked = false;
+let caixaPinRole = null;                       // 'admin' | 'super'
+let pinFlow = { mode:'enter', currentPin:'' }; // 'enter' = digitar o PIN | 'create' = 1º acesso do admin
+let pinBusy = false;
+
+function lockCaixa(){ caixaUnlocked = false; caixaPinRole = null; }
+
+function openPinModal(){
+  pinFlow = { mode:'enter', currentPin:'' };
+  renderPinModal();
+  document.getElementById('pinModal').classList.add('show');
+}
+function closePinModal(){
+  document.getElementById('pinModal').classList.remove('show');
+}
+function showPinError(msg){
+  document.getElementById('pinError').textContent = msg;
+}
+function renderPinModal(){
+  const create = pinFlow.mode === 'create';
+  const in1 = document.getElementById('pinInput1');
+  const in2 = document.getElementById('pinInput2');
+  document.getElementById('pinTitle').textContent = create ? 'Crie seu PIN' : 'Acesso ao Caixa';
+  document.getElementById('pinHint').textContent = create
+    ? 'Este é o seu primeiro acesso. Crie um PIN de 4 dígitos para o Caixa.'
+    : 'Digite o PIN de 4 dígitos.';
+  document.getElementById('pinSubmit').textContent = create ? 'Salvar PIN' : 'Entrar';
+  in1.value = ''; in2.value = '';
+  in1.placeholder = create ? 'Novo PIN' : '••••';
+  in2.style.display = create ? 'block' : 'none';
+  showPinError('');
+  setTimeout(() => in1.focus(), 50);
+}
+function onPinInput(){
+  ['pinInput1','pinInput2'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = el.value.replace(/\D/g, '');
+  });
+  showPinError('');
+  // Ao digitar o 4º dígito já confere (só no modo de digitar o PIN; criar tem confirmação).
+  if(pinFlow.mode === 'enter' && document.getElementById('pinInput1').value.length === 4) submitPin();
+}
+async function submitPin(){
+  if(pinBusy) return;
+  const in1 = document.getElementById('pinInput1');
+  const pin1 = in1.value;
+  const pin2 = document.getElementById('pinInput2').value;
+  if(!/^\d{4}$/.test(pin1)){ showPinError('O PIN tem 4 dígitos.'); return; }
+  if(pinFlow.mode === 'create' && pin1 !== pin2){ showPinError('Os PINs não coincidem.'); return; }
+
+  pinBusy = true;
+  const btn = document.getElementById('pinSubmit');
+  btn.disabled = true;
+  try{
+    if(pinFlow.mode === 'enter'){
+      const res = await apiPost('verifyCaixaPin', { pin: pin1 });
+      if(res.error){ showPinError(res.error); in1.value = ''; in1.focus(); return; }
+      if(res.mustChange){
+        // Entrou com o PIN padrão: é o primeiro acesso, precisa criar o próprio PIN.
+        pinFlow = { mode:'create', currentPin: pin1 };
+        renderPinModal();
+        return;
+      }
+      unlockCaixa(res.role);
+    } else {
+      const res = await apiPost('setCaixaPin', { currentPin: pinFlow.currentPin, newPin: pin1 });
+      if(res.error){ showPinError(res.error); return; }
+      toast('✅ PIN criado! Se esquecer, consulte em Configuração.', 4000);
+      unlockCaixa('admin');
+    }
+  } catch(e){
+    showPinError('Não foi possível conferir o PIN. Verifique a internet.');
+  } finally {
+    pinBusy = false;
+    btn.disabled = false;
+  }
+}
+function unlockCaixa(role){
+  caixaUnlocked = true;
+  caixaPinRole = role;
+  closePinModal();
+  setAdminTab('caixa');
+}
+
+/* ===================== ADMIN · CONFIGURAÇÃO ===================== */
+let cfgPinHideTimer = null;
+
+// Mostra o PIN do admin (pra quem esqueceu) depois de conferir a senha da conta no servidor.
+async function revealCaixaPin(){
+  const input = document.getElementById('cfgPinPassword');
+  if(!input.value){ toast('Informe a senha de acesso'); return; }
+  toast('Verificando...');
+  const res = await apiPost('getCaixaPin', { password: input.value });
+  if(res.error){ toast(res.error); return; }
+  input.value = '';
+  const box = document.getElementById('cfgPinResult');
+  box.innerHTML = `Seu PIN do Caixa<strong>${res.pin}</strong>`
+    + (res.isDefault ? `<span>Este ainda é o PIN padrão — você cria o seu ao abrir o Caixa pela primeira vez.</span>` : '')
+    + `<span>Some da tela em 20 segundos.</span>`;
+  box.style.display = 'block';
+  clearTimeout(cfgPinHideTimer);
+  cfgPinHideTimer = setTimeout(hideCaixaPin, 20000);
+}
+function hideCaixaPin(){
+  clearTimeout(cfgPinHideTimer);
+  const box = document.getElementById('cfgPinResult');
+  if(box){ box.style.display = 'none'; box.innerHTML = ''; }
+}
+
+async function submitAdminPasswordChange(){
+  const cur = document.getElementById('cfgPassCurrent').value;
+  const nw  = document.getElementById('cfgPassNew').value;
+  const cf  = document.getElementById('cfgPassConfirm').value;
+  if(!cur){ toast('Informe a senha atual'); return; }
+  if(nw.length < 6){ toast('A nova senha deve ter pelo menos 6 caracteres'); return; }
+  if(nw !== cf){ toast('As senhas não coincidem'); return; }
+  toast('Salvando...');
+  const res = await apiPost('changeAdminPassword', { currentPass: cur, newPass: nw });
+  if(res.error){ toast(res.error); return; }
+  // O servidor gera um token novo (o antigo deixa de valer nos outros aparelhos).
+  state.adminToken = res.token;
+  saveSession();
+  ['cfgPassCurrent','cfgPassNew','cfgPassConfirm'].forEach(id => { document.getElementById(id).value = ''; });
+  toast('✅ Senha alterada! Os outros aparelhos precisarão entrar de novo.', 4500);
+}
+
 /* ===================== ADMIN TABS ===================== */
 function setAdminTab(tab){
+  // Caixa só abre com PIN; sem ele, pede o PIN e fica na aba atual.
+  if(tab === 'caixa' && !caixaUnlocked){ openPinModal(); return; }
+  if(tab !== 'config') hideCaixaPin();
   document.querySelectorAll('#adminTabs .chip').forEach(c => c.classList.toggle('active', c.dataset.tab === tab));
   document.querySelectorAll('.admin-tab').forEach(t => t.style.display = 'none');
   document.getElementById('adminTab-' + tab).style.display = 'block';

@@ -316,6 +316,7 @@
       <div class="chip" data-tab="staff" onclick="setAdminTab('staff')">Colaboradores</div>
       <div class="chip" data-tab="services" onclick="setAdminTab('services')">Serviços</div>
       <div class="chip" data-tab="clients" onclick="setAdminTab('clients')">Clientes</div>
+      <div class="chip" data-tab="config" onclick="setAdminTab('config')">Configuração</div>
     </div>
 
     <div class="share-bar">
@@ -513,6 +514,26 @@
       <div id="caixaByPayment" style="padding:0 22px; margin-top:10px;"></div>
     </div>
 
+    <!-- TAB: CONFIGURAÇÃO -->
+    <div class="admin-tab" id="adminTab-config" style="display:none;">
+      <div class="admin-block"><h3>PIN do Caixa</h3></div>
+      <p class="cfg-help">Esqueceu o PIN que você criou? Informe a senha de acesso da sua conta para visualizá-lo.</p>
+      <div class="admin-inline-form cfg-card">
+        <div class="field"><label>Senha de acesso</label><input id="cfgPinPassword" type="password" autocomplete="current-password" placeholder="Sua senha de administrador"></div>
+        <button class="btn btn-green" onclick="revealCaixaPin()">Ver meu PIN</button>
+        <div id="cfgPinResult" class="cfg-result" style="display:none;"></div>
+      </div>
+
+      <div class="admin-block"><h3>Senha de acesso ADMIN</h3></div>
+      <p class="cfg-help">Altere a senha usada para entrar no painel. Ao trocar, os outros aparelhos precisarão entrar de novo.</p>
+      <div class="admin-inline-form cfg-card">
+        <div class="field"><label>Senha atual</label><input id="cfgPassCurrent" type="password" autocomplete="current-password"></div>
+        <div class="field"><label>Nova senha</label><input id="cfgPassNew" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></div>
+        <div class="field"><label>Confirmar nova senha</label><input id="cfgPassConfirm" type="password" autocomplete="new-password"></div>
+        <button class="btn btn-green" onclick="submitAdminPasswordChange()">Alterar senha</button>
+      </div>
+    </div>
+
     <!-- TAB: CLIENTES -->
     <div class="admin-tab" id="adminTab-clients" style="display:none;">
       <div class="admin-block"><h3>Clientes cadastrados</h3></div>
@@ -702,6 +723,21 @@
       </div>
     </div>
   </section>
+  <!-- PIN DO CAIXA: pede o PIN (ou, no primeiro acesso do admin, a criação de um novo) -->
+  <div class="modal-overlay" id="pinModal">
+    <div class="modal-card pin-card">
+      <h2 class="display" id="pinTitle">Acesso ao Caixa</h2>
+      <p class="muted" id="pinHint">Digite o PIN de 4 dígitos.</p>
+      <input id="pinInput1" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="••••" oninput="onPinInput()">
+      <input id="pinInput2" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="Confirme" oninput="onPinInput()" style="display:none;">
+      <div class="pin-error" id="pinError"></div>
+      <div class="pin-actions">
+        <button class="btn btn-ghost" onclick="closePinModal()">Cancelar</button>
+        <button class="btn btn-green" id="pinSubmit" onclick="submitPin()">Entrar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="successModal">
     <div class="modal-card">
       <div class="confirm-icon">
