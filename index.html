@@ -21,12 +21,13 @@
 </head>
 <body>
 
-<div class="shell" id="shell" transition-style="in:circle:hesitate">
+<div class="shell" id="shell">
 
   <!-- ============ LOGIN ============ -->
   <section class="screen active no-nav" id="screen-login">
     <div class="hero">
       <button class="hero-admin-btn" onclick="showScreen('screen-admin-login')">Acesso profissional</button>
+      <div class="xmas" id="xmas" aria-hidden="true"></div>
       <img class="logo-mark" src="logo-monteiro.jpeg" alt="Monteiro Barbearia">
       <p class="tag">Agendamento online</p>
 
@@ -160,6 +161,15 @@
       </button>
       <h2 class="display" id="bkTitle">Agendamento</h2>
       <button id="cancelEditBtn" onclick="cancelEditBooking()" style="display:none; font-size:.72rem; color:var(--muted); background:none; border:none; cursor:pointer; white-space:nowrap;">Cancelar edição</button>
+    </div>
+
+    <!-- Banner da campanha de fim de ano (só aparece em dezembro) -->
+    <div class="promo-banner" id="promoBanner" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 2v3M16 2v3"/><rect x="3" y="4.5" width="15" height="15" rx="2.5"/><path d="M3 9.5h15"/>
+        <circle cx="17" cy="17" r="5" fill="#1a1413"/><path d="M17 14.4V17l1.8 1.2"/>
+      </svg>
+      <p><strong>Agenda de dezembro disputada!</strong> Reserve seu horário com antecedência e garanta seu visual para as festas.</p>
     </div>
 
     <div class="summary-chip">
@@ -723,6 +733,27 @@
       </div>
     </div>
   </section>
+  <!-- CAMPANHA DE FIM DE ANO: pop-up de alta demanda, mostrado depois do login do cliente -->
+  <div class="modal-overlay promo-overlay" id="promoModal" role="dialog" aria-modal="true" aria-labelledby="promoTitle" onclick="closePromoOnBackdrop(event)">
+    <div class="promo-card" id="promoCard" tabindex="-1">
+      <button class="promo-close" onclick="closePromoModal()" aria-label="Fechar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <svg class="promo-flake" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M12 2v20M3.3 7l17.4 10M20.7 7L3.3 17"/><path d="M10 3.7L12 5.5l2-1.8M10 20.3L12 18.5l2 1.8"/></svg>
+      <div class="promo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M8 2v3M16 2v3"/><rect x="3" y="4.5" width="15" height="15" rx="2.5"/><path d="M3 9.5h15"/>
+          <circle cx="17" cy="17" r="5" fill="#1a1413"/><path d="M17 14.4V17l1.8 1.2"/>
+        </svg>
+      </div>
+      <span class="promo-tag">Agenda especial de dezembro</span>
+      <h2 class="display" id="promoTitle">Garanta seu visual para as festas!</h2>
+      <p class="promo-text">Com a chegada do Natal e do Ano Novo, a procura por horários aumenta. Antecipe seu agendamento e evite ficar sem aquele corte especial.</p>
+      <button class="btn btn-gold promo-cta" id="promoCta" onclick="promoSchedule()">Agendar meu horário</button>
+      <button class="btn btn-ghost promo-skip" onclick="closePromoModal()">Agora não</button>
+    </div>
+  </div>
+
   <!-- PIN DO CAIXA: pede o PIN (ou, no primeiro acesso do admin, a criação de um novo) -->
   <div class="modal-overlay" id="pinModal">
     <div class="modal-card pin-card">

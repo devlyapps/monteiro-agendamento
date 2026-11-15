@@ -470,6 +470,7 @@ async function finishLogin(){
   showScreen('screen-home'); setNav('home');
   updateReminderBanner();
   saveSession();
+  maybeShowHolidayPopup();
   await loadMyBookings();
 }
 
@@ -3514,8 +3515,108 @@ async function saveCaixaRecord(){
   renderCaixaList();
 }
 
+/* ===================== DECORAÇÃO DE NATAL (tela de login) ===================== */
+// Neve leve + "Boas Festas" atrás da logo. Liga sozinho de 1º de dezembro a 6 de janeiro.
+// Pra testar fora da época: abrir o app com ?natal=1 no final do endereço (e ?natal=0 desliga).
+function initXmas(){
+  const box = document.getElementById('xmas');
+  if(!box) return;
+  const flag = new URLSearchParams(location.search).get('natal');
+  const now = new Date();
+  const inSeason = now.getMonth() === 11 || (now.getMonth() === 0 && now.getDate() <= 6);
+  if(flag === '0' || (flag !== '1' && !inSeason)) return;
+
+  // Neve: poucos flocos (leve pra celulares simples), cada um com tamanho/velocidade próprios.
+  const r = (min, max) => min + Math.random() * (max - min);
+  let html = '';
+  for(let i = 0; i < 26; i++){
+    html += `<i class="sf" style="--x:${r(0, 100).toFixed(1)}%; --s:${r(2, 5).toFixed(1)}px; --o:${r(0.35, 0.9).toFixed(2)}; --dur:${r(8, 15).toFixed(1)}s; --delay:-${r(0, 15).toFixed(1)}s; --drift:${r(-40, 40).toFixed(0)}px"></i>`;
+  }
+  box.innerHTML = html;
+
+  // "Boas Festas" à esquerda da logo e uma árvore de Natal à direita, os dois ao fundo
+  // (a logo tem z-index maior e cobre uma pontinha deles). A fonte só é baixada na temporada.
+  const logo = document.querySelector('#screen-login .logo-mark');
+  if(logo && !document.getElementById('xmasGreeting')){
+    const tree = `<svg class="xmas-tree" viewBox="0 0 80 100" aria-hidden="true">
+      <rect x="34" y="84" width="12" height="13" rx="2" fill="#6b4a2b"/>
+      <g stroke-linejoin="round" stroke-width="4">
+        <polygon points="40,46 69,86 11,86" fill="#25864a" stroke="#25864a"/>
+        <polygon points="40,28 63,64 17,64" fill="#2f9e52" stroke="#2f9e52"/>
+        <polygon points="40,12 57,44 23,44" fill="#3fae66" stroke="#3fae66"/>
+      </g>
+      <polygon points="40,1 42.4,7.6 49.4,7.8 43.8,12 45.8,18.6 40,14.7 34.2,18.6 36.2,12 30.6,7.8 37.6,7.6" fill="#f5d060"/>
+      <circle cx="35" cy="36" r="2.8" fill="#e2543a"/><circle cx="46" cy="26" r="2.4" fill="#f5d060"/>
+      <circle cx="46" cy="54" r="3" fill="#6fb7ff"/><circle cx="31" cy="58" r="2.8" fill="#f5d060"/>
+      <circle cx="40" cy="70" r="3.2" fill="#e2543a"/><circle cx="55" cy="76" r="2.8" fill="#f5d060"/>
+      <circle cx="24" cy="78" r="3" fill="#6fb7ff"/>
+    </svg>`;
+    logo.insertAdjacentHTML('beforebegin', '<p class="xmas-greeting" id="xmasGreeting"><span>Boas</span><span>Festas</span></p>' + tree);
+    const font = document.createElement('link');
+    font.rel = 'stylesheet';
+    font.href = 'https://fonts.googleapis.com/css2?family=Pacifico&display=swap';
+    document.head.appendChild(font);
+  }
+}
+
+/* ===================== CAMPANHA DE FIM DE ANO ===================== */
+// Pop-up de alta demanda (depois do login do cliente) + banner na tela de agendamento.
+// Ativa em dezembro. Pra testar fora da época: ?natal=1 no endereço (força, e mostra o
+// pop-up sempre); ?natal=0 desliga.
+function holidayCampaignActive(){
+  const flag = new URLSearchParams(location.search).get('natal');
+  if(flag === '1') return true;
+  if(flag === '0') return false;
+  return new Date().getMonth() === 11;
+}
+function updatePromoBanner(){
+  const el = document.getElementById('promoBanner');
+  if(el) el.hidden = !holidayCampaignActive();
+}
+
+// No máximo uma vez por dia em cada aparelho — senão apareceria toda vez que o app
+// abre com a sessão salva, o que cansa o cliente.
+const PROMO_SEEN_KEY = 'monteiro_dec_promo_v1';
+function maybeShowHolidayPopup(){
+  if(state.isAdmin || !holidayCampaignActive()) return;
+  const forced = new URLSearchParams(location.search).get('natal') === '1';
+  if(!forced){
+    try{
+      const today = isoOffset(0);
+      if(localStorage.getItem(PROMO_SEEN_KEY) === today) return;
+      localStorage.setItem(PROMO_SEEN_KEY, today);
+    } catch(e){}
+  }
+  // Pequena pausa pra tela inicial aparecer antes, e a entrada do pop-up ser percebida.
+  setTimeout(() => {
+    document.getElementById('promoModal').classList.add('show');
+    document.getElementById('promoCard').focus({ preventScroll:true }); // foco na janela (leitores de tela), sem contorno no botão
+  }, 700);
+}
+function closePromoModal(){
+  document.getElementById('promoModal').classList.remove('show');
+}
+function closePromoOnBackdrop(e){
+  if(e.target === document.getElementById('promoModal')) closePromoModal();
+}
+// O agendamento começa escolhendo o serviço (tela inicial); daí abre a tela de agendamento.
+function promoSchedule(){
+  closePromoModal();
+  showScreen('screen-home'); setNav('home');
+  setTimeout(() => {
+    const list = document.getElementById('serviceList');
+    const target = list && (list.previousElementSibling || list);
+    if(target) target.scrollIntoView({ behavior:'smooth', block:'start' });
+  }, 120);
+}
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && document.getElementById('promoModal').classList.contains('show')) closePromoModal();
+});
+
 /* ===================== INIT ===================== */
 async function init(){
+  initXmas();
+  updatePromoBanner();
   initFcm();
   try{
     await loadData();
@@ -3548,6 +3649,7 @@ async function init(){
       renderCategoryChips(); renderServices();
       showScreen('screen-home'); setNav('home');
       updateReminderBanner();
+      maybeShowHolidayPopup();
       await loadMyBookings();
       renderAppointments();
     }

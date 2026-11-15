@@ -39,12 +39,6 @@
     position:relative;
     overflow-x:hidden;
     box-shadow:0 0 60px rgba(0,0,0,.6);
-    animation:circle-in-hesitate 2.5s cubic-bezier(.25, 1, .30, 1) both;
-  }
-  @keyframes circle-in-hesitate{
-    0%{ clip-path:circle(0%); }
-    40%{ clip-path:circle(40%); }
-    100%{ clip-path:circle(125%); }
   }
 
   /* ---------- screens ---------- */
@@ -59,8 +53,9 @@
   @keyframes overlayFadeIn{from{opacity:0;} to{opacity:1;}}
   @media (prefers-reduced-motion: reduce){
     .screen.active{animation:none;}
-    .logo-mark{animation:none;}
-    .shell{animation:none;}
+    .sf{display:none;}
+    .promo-card, .promo-icon, .promo-flake, .promo-banner{animation:none;}
+    .xmas-greeting, .xmas-tree{animation:none; opacity:.9;}
   }
 
   /* ---------- topbar (internal screens) ---------- */
@@ -98,9 +93,8 @@
   .logo-mark{
     width:172px; height:172px; border-radius:50%; object-fit:cover;
     border:2px solid var(--red); box-shadow:0 0 0 6px rgba(196,60,45,.12), 0 18px 40px rgba(0,0,0,.5);
-    animation:spinY 11s linear infinite;
+    position:relative; z-index:1; /* acima do "Boas Festas" e da árvore de Natal, que ficam ao fundo */
   }
-  @keyframes spinY{ from{transform:rotateY(0deg);} to{transform:rotateY(360deg);} }
   .hero p.tag{font-size:.78rem; color:var(--red-bright); letter-spacing:.16em; text-transform:uppercase;}
   .hero-admin-btn{
     position:absolute; top:16px; right:16px; z-index:2;
@@ -109,6 +103,34 @@
     cursor:pointer; backdrop-filter:blur(4px);
   }
   .hero-admin-btn:active{transform:scale(.97);}
+
+  /* ---------- Decoração de Natal (tela de login) ---------- */
+  .xmas{position:absolute; inset:0; z-index:2; pointer-events:none; overflow:hidden;} /* neve por cima de tudo */
+  /* "Boas Festas" (esquerda) e árvore (direita): ficam ao fundo, atrás da logo (z-index 0 < logo 1),
+     com uma pontinha escondida por ela. */
+  .hero p.xmas-greeting{
+    position:absolute; z-index:0; left:3%; top:88px; margin:0;
+    display:flex; flex-direction:column; align-items:flex-start; line-height:1.05;
+    /* o tamanho acompanha a largura da tela pra sobrar um respiro entre "Festas" e a logo */
+    font-family:'Pacifico','Playfair Display',cursive; font-weight:400; font-size:clamp(1.2rem, calc(14vw - 27.5px), 2rem);
+    color:#f5d060; text-shadow:0 0 18px rgba(245,208,96,.4);
+    transform:rotate(-8deg); transform-origin:center; pointer-events:none;
+    animation:xgreet 1.4s ease .5s both;
+  }
+  .xmas-greeting span:first-child{margin-left:.06em;}
+  .xmas-greeting span:last-child{margin-left:.45em;}
+  .xmas-tree{
+    position:absolute; z-index:0; right:6%; top:78px; width:76px; height:auto; pointer-events:none;
+    transform:rotate(6deg); filter:drop-shadow(0 0 14px rgba(111,227,160,.25));
+    animation:xgreet 1.4s ease .5s both;
+  }
+  @keyframes xgreet{from{opacity:0;} to{opacity:.9;}}
+  .sf{
+    position:absolute; top:-10px; left:var(--x); width:var(--s); height:var(--s);
+    border-radius:50%; background:#fff; opacity:var(--o);
+    animation:snowfall var(--dur) linear infinite; animation-delay:var(--delay);
+  }
+  @keyframes snowfall{from{transform:translate3d(0,0,0);} to{transform:translate3d(var(--drift), 460px, 0);}}
 
   .hero-info{width:100%; max-width:300px; margin-top:6px; padding-top:18px; border-top:1px solid var(--red-dim);}
   .hero-line{display:flex; align-items:flex-start; gap:8px; font-size:.74rem; color:var(--muted); line-height:1.45; margin-bottom:9px; text-align:left;}
@@ -299,6 +321,60 @@
   .summary-chip b{color:var(--red-bright); font-size:1.05rem; font-family:'Playfair Display',serif;}
 
   /* ---------- Caixa: cards dos meses do ano ---------- */
+  /* ---------- Campanha de fim de ano: pop-up e banner ---------- */
+  .promo-card{
+    position:relative; width:100%; max-width:380px; max-height:calc(100vh - 48px); overflow-y:auto;
+    padding:34px 24px 22px; text-align:center; border-radius:20px;
+    background:
+      radial-gradient(120% 60% at 50% 0%, rgba(196,60,45,.22), transparent 62%),
+      linear-gradient(180deg, #1b1514 0%, #121010 100%);
+    border:1px solid rgba(245,208,96,.3);
+    box-shadow:0 22px 60px rgba(0,0,0,.65), 0 0 0 1px rgba(196,60,45,.14), inset 0 1px 0 rgba(245,208,96,.2);
+    animation:promoIn .6s cubic-bezier(.2,.9,.3,1.05) both;
+  }
+  .promo-card:focus{outline:none;}
+  .promo-card::before{
+    content:''; position:absolute; top:0; left:18%; right:18%; height:2px;
+    background:linear-gradient(90deg, transparent, #f5d060, transparent);
+  }
+  @keyframes promoIn{from{opacity:0; transform:translateY(24px) scale(.94);} to{opacity:1; transform:none;}}
+  .promo-close{
+    position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:50%;
+    display:grid; place-items:center; cursor:pointer; color:var(--muted);
+    background:rgba(255,255,255,.05); border:1px solid var(--red-dim);
+  }
+  .promo-close svg{width:16px; height:16px;}
+  .promo-close:active{transform:scale(.92);}
+  .promo-flake{position:absolute; top:16px; left:16px; width:20px; height:20px; color:#f5d060; opacity:.35; animation:promoTwinkle 3.2s ease-in-out infinite;}
+  @keyframes promoTwinkle{0%,100%{opacity:.18;} 50%{opacity:.5;}}
+  .promo-icon{
+    width:74px; height:74px; margin:0 auto 14px; border-radius:50%; display:grid; place-items:center; color:#f5d060;
+    background:radial-gradient(circle at 50% 30%, rgba(245,208,96,.2), rgba(196,60,45,.1) 70%);
+    border:1px solid rgba(245,208,96,.4); box-shadow:0 0 30px rgba(245,208,96,.18);
+    animation:promoPop .7s .25s cubic-bezier(.2,.9,.3,1.3) both;
+  }
+  .promo-icon svg{width:40px; height:40px;}
+  @keyframes promoPop{from{opacity:0; transform:scale(.6);} to{opacity:1; transform:none;}}
+  .promo-tag{
+    display:inline-flex; align-items:center; gap:9px; margin-bottom:10px;
+    font-size:.66rem; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:#f5d060;
+  }
+  .promo-tag::before, .promo-tag::after{content:''; width:5px; height:5px; background:#c43c2d; transform:rotate(45deg);}
+  .promo-card h2{font-size:1.5rem; line-height:1.2; margin-bottom:12px; color:var(--cream);}
+  .promo-text{font-size:.9rem; line-height:1.6; color:var(--muted); margin-bottom:22px;}
+  .promo-cta{margin-bottom:10px; box-shadow:0 8px 22px rgba(196,60,45,.35);}
+  .promo-skip{padding:13px; font-size:.88rem;}
+  .promo-banner{
+    margin:0 22px 14px; padding:10px 14px; display:flex; align-items:center; gap:12px;
+    border-radius:var(--radius-sm); border:1px solid rgba(245,208,96,.28);
+    background:linear-gradient(90deg, rgba(196,60,45,.18), rgba(245,208,96,.07));
+    animation:fadeSlide .5s ease both;
+  }
+  .promo-banner[hidden]{display:none;}
+  .promo-banner svg{width:26px; height:26px; flex:none; color:#f5d060;}
+  .promo-banner p{font-size:.76rem; line-height:1.4; color:var(--cream);}
+  .promo-banner strong{color:#f5d060; font-weight:600;}
+
   /* ---------- PIN do Caixa e aba Configuração ---------- */
   .pin-card{max-width:340px;}
   .pin-input{
