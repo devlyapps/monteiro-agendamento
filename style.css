@@ -545,6 +545,7 @@
   .appt-info h3{font-size:.95rem; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .appt-info .appt-phone{font-size:.8rem; color:var(--red-bright); text-decoration:none; display:block; margin-bottom:2px;}
   .appt-info p{font-size:.76rem; color:var(--muted);}
+  .appt-info p.appt-when{font-size:.84rem; color:var(--cream); font-weight:500; margin-bottom:1px;}
   .appt-card-bottom{display:flex; align-items:center; justify-content:space-between; padding-top:8px; border-top:1px solid rgba(196,60,45,.08);}
   .appt-status{
     font-size:.62rem; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:.06em;

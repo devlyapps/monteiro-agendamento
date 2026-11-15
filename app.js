@@ -205,9 +205,13 @@ function isoOffset(days){
   const dd = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${dd}`;
 }
+// Data completa dd/mm/aaaa (sem isso, várias telas mostravam só "Ter 01", sem mês nem ano).
+function fmtDMY(d){
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
 function fmtDateLong(iso){
   const d = new Date(iso+'T00:00');
-  return `${weekdayFull[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}`;
+  return `${weekdayFull[d.getDay()]}, ${fmtDMY(d)}`;
 }
 // Escapa texto vindo de cliente (ex: nome no cadastro) antes de inserir via innerHTML —
 // sem isso, alguém poderia se cadastrar com um nome tipo "<img src=x onerror=...>" e
@@ -1220,7 +1224,8 @@ function renderAppointments(){
         <div class="appt-date"><span>${weekdayLabel[d.getDay()]}</span><strong>${String(d.getDate()).padStart(2,'0')}</strong></div>
         <div class="appt-info">
           <h3>${s ? s.name : 'Serviço'}</h3>
-          <p>${p ? p.name : ''} · ${b.time}</p>
+          <p class="appt-when">${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} · ${b.time}</p>
+          <p>${p ? p.name : ''}</p>
         </div>
         <div class="appt-status">Confirmado</div>
       </div>
@@ -2185,8 +2190,9 @@ function renderAgendaApptList(){
     const d = agendaSelectedDate ? new Date(agendaSelectedDate+'T00:00') : null;
     const dayLabel = d ? weekdayLabel[d.getDay()] : '—';
     const dayNum = d ? String(d.getDate()).padStart(2,'0') : '—';
+    const fullDate = d ? fmtDMY(d) : '—';
     const phone = String(b.clientPhone || '').replace(/\D/g,'');
-    const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Barbearia Monteiro. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dayLabel}, dia ${dayNum}, as ${timeStr}. Aguardamos voce!`);
+    const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Barbearia Monteiro. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${d ? weekdayFull[d.getDay()] + ', ' : ''}${fullDate}, as ${timeStr}. Aguardamos voce!`);
     const waLink = phone ? `https://wa.me/55${phone}?text=${waMsg}` : '';
     const payLabel = b.payment || '';
     const phoneFormatted = formatPhoneBR(phone);
@@ -2198,7 +2204,7 @@ function renderAgendaApptList(){
           <div class="appt-info">
             <h3 ${phone ? `onclick="goToClientLoyalty('${clientNameSafe}','${phone}')" style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px;"` : ''}>${escapeHtml(b.clientName || 'Cliente')}</h3>
             ${phoneFormatted ? `<a href="tel:+55${phone}" class="appt-phone">${phoneFormatted}</a>` : ''}
-            <p>${s ? s.name : 'Servico'} · ${timeStr}</p>
+            <p>${s ? s.name : 'Servico'} · ${fullDate} · ${timeStr}</p>
             ${payLabel ? `<p style="color:var(--green-bright); font-size:.8rem; margin-top:2px;">💳 ${payLabel}</p>` : ''}
           </div>
         </div>
@@ -3422,7 +3428,7 @@ function renderCaixaList(){
         try { const t = new Date(timeStr); timeStr = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`; } catch(e){}
       }
       const d = dateStr ? new Date(dateStr + 'T00:00') : null;
-      const dateLabel = d ? `${weekdayLabel[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}` : '—';
+      const dateLabel = d ? `${weekdayLabel[d.getDay()]} ${fmtDMY(d)}` : '—';
       const payLabel = b.payment ? `💳 ${b.payment}` : '';
       const phone = String(b.clientPhone || '').replace(/\D/g,'');
       const waMsg = encodeURIComponent(`Ola ${b.clientName || 'cliente'}! Este e um lembrete da Barbearia Monteiro. Voce tem um agendamento de ${s ? s.name : 'servico'} marcado para ${dateLabel} as ${timeStr || '—'}. Aguardamos voce!`);
