@@ -173,6 +173,33 @@ async function loadData(){
   validatedBookingIds = new Set((data.validatedBookingIds || []).map(String));
 }
 
+// Rebusca a configuração pública (janela de agendamento, horários, serviços...) pro
+// cliente que deixou o app aberto: sem isso ele continuava com a regra antiga (ex: 30
+// dias) por dias, mesmo depois do admin reduzir a janela. O admin não entra aqui —
+// ele já tem a lista completa de agendamentos em memória.
+let lastDataRefresh = Date.now();
+async function refreshPublicData(){
+  if(state.isAdmin) return;
+  try{ await loadData(); lastDataRefresh = Date.now(); } catch(e){ return; }
+  const active = document.querySelector('.screen.active')?.id;
+  if(active === 'screen-booking'){
+    // Se a data escolhida passou a ficar fora da janela, volta pra hoje.
+    if(state.selectedDate && state.selectedDate > isoOffset(Number(businessConfig.bookingWindow) || 30)){
+      state.selectedDate = isoOffset(0);
+      state.selectedSlot = null;
+      updateConfirmBtn();
+    }
+    renderClientCal(); renderSlots();
+  } else if(active === 'screen-plan-booking'){
+    renderPlanCal();
+  } else if(active === 'screen-home'){
+    renderHeroHours(); renderServices();
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && !state.isAdmin && Date.now() - lastDataRefresh > 2 * 60 * 1000) refreshPublicData();
+});
+
 function renderHeroHours(){
   const wrap = document.getElementById('heroHours');
   if(!wrap) return;
@@ -865,6 +892,7 @@ function openBooking(serviceId){
   renderSlots();
   updateConfirmBtn();
   showScreen('screen-booking');
+  refreshPublicData(); // garante a janela de agendamento atual (o app pode ter ficado aberto)
 }
 // Chamado pelo link "Editar agendamento" em Meus horários — o cliente escolhe
 // o novo serviço/horário pela tela normal de agendamento; confirmBooking()
@@ -1169,6 +1197,9 @@ async function confirmBooking(){
     toast(res.error);
     updateConfirmBtn(); // reabilita conforme o estado atual da seleção
     if(res.error.includes('reservado por outra pessoa')) renderSlots(); // atualiza a grade de horários
+    // Data fora da janela de agendamento (o admin reduziu e o app estava desatualizado):
+    // baixa a configuração nova e refaz o calendário.
+    if(res.error.includes('período de agendamento')) refreshPublicData();
     return;
   }
 
@@ -1382,6 +1413,7 @@ function openPlanBookingScreen(plan){
   renderPlanSlots();
   updatePlanConfirmBtn();
   showScreen('screen-plan-booking');
+  refreshPublicData();
 }
 
 function renderPlanProfessionals(){
@@ -1557,6 +1589,7 @@ async function confirmPlanBooking(){
   if(res.error){
     toast(res.error);
     updatePlanConfirmBtn();
+    if(res.error.includes('período de agendamento')) refreshPublicData();
     return;
   }
   (res.dates || []).forEach((d, i) => {
